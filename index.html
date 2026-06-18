@@ -1,30 +1,762 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Beach Volleyball Training Tracker</title>
-<style>
-:root{--bg:#fff8ec;--panel:#fff;--ink:#1f2933;--muted:#667085;--line:#eadfcc;--sea:#2e8f9e;--coral:#ef7a62;--green:#4f9f75;--sun:#f6b84b;--shadow:0 10px 24px rgba(31,41,51,.10);--radius:18px}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#eef9fb);color:var(--ink);line-height:1.5}.wrap{max-width:1160px;margin:0 auto;padding:0 16px}header{padding:28px 0 20px;border-bottom:1px solid var(--line);background:radial-gradient(circle at 10% 0,#ffe5ad,transparent 30%),linear-gradient(135deg,#fff8ec,#e9f9fb)}h1{margin:0;font-size:clamp(2rem,5vw,4rem);letter-spacing:-.04em;line-height:1}h2{margin:0 0 14px;font-size:1.8rem}h3{margin:0 0 8px}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.pill{border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.76);padding:8px 11px;font-weight:800;font-size:.88rem}.topnav{position:sticky;top:0;z-index:10;background:rgba(255,248,236,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}.topnav .wrap,.subnav{display:flex;gap:8px;overflow-x:auto;padding:10px 16px}.subnav{padding:0 0 16px;flex-wrap:wrap}.tab,.subtab,.btn{border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);padding:10px 14px;font-weight:900;cursor:pointer;white-space:nowrap}.tab.active,.subtab.active,.btn.primary{background:var(--sea);color:#fff;border-color:var(--sea)}.btn.secondary{background:#fff7e8}main{padding:22px 0 48px}.page,.section{display:none}.page.active,.section.active{display:block}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin:14px 0}.grid{display:grid;gap:14px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.callout{border-left:5px solid var(--coral);background:#fff3ed}.good{border-left-color:var(--green);background:#f2fbf5}.warn{border-left-color:var(--sun);background:#fff9e9}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#fff2d9}.formgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}label{display:block;font-weight:850;margin:10px 0 5px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;font:inherit;background:#fff}textarea{min-height:90px}.checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.checkitem{display:flex;gap:8px;border:1px solid var(--line);background:#fffaf1;border-radius:12px;padding:9px}.checkitem input{width:auto}.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}.dow{text-align:center;color:var(--muted);font-size:.78rem;font-weight:900}.day{min-height:78px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:7px;cursor:pointer;text-align:left}.day.empty{background:transparent;border:0;cursor:default}.day.done{background:#edf9f1}.day.partial{background:#fff8df}.day.rest{background:#f3f6f8}.num{font-weight:900}.tiny{font-size:.78rem;color:var(--muted)}.legend{display:flex;gap:12px;flex-wrap:wrap}.dot{display:inline-block;width:9px;height:9px;border-radius:999px;margin-right:4px}.workout-list li{margin:8px 0}.exercise-link{color:var(--sea);font-weight:900;text-decoration:none;border-bottom:1px dashed var(--sea)}.ref-card{display:grid;grid-template-columns:96px 1fr;gap:14px}.demo{height:96px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#fff4dc,#e9f8fb);display:grid;place-items:center}.demo svg{width:78px;height:78px}.video-links a,.quick-links a{display:inline-flex;margin:4px 6px 4px 0;padding:7px 9px;border-radius:999px;background:#fff7e8;border:1px solid var(--line);color:#4a3427;text-decoration:none;font-size:.84rem;font-weight:800}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(30px);opacity:0;background:#1f2933;color:#fff;padding:12px 16px;border-radius:999px;box-shadow:var(--shadow);z-index:99;font-weight:900;transition:.22s}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.toast.error{background:#d9564a}.toast.warn{background:#9a6a12}.miniwrap{display:flex;gap:12px;flex-wrap:wrap}.mini{flex:1 1 170px;background:#fffaf1;border:1px solid var(--line);border-radius:14px;padding:12px}footer{text-align:center;color:var(--muted);font-size:.82rem;padding:20px}@media(max-width:840px){.two,.three,.formgrid,.checks{grid-template-columns:1fr}.ref-card{grid-template-columns:1fr}.day{min-height:66px;font-size:.85rem}.calendar{gap:4px}.topnav .wrap{padding-left:12px}}@media print{.topnav,.subnav,.btn,.toast{display:none!important}.page,.section{display:block!important}.card{box-shadow:none;break-inside:avoid}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beach Volleyball Training Hub</title>
+  <meta name="description" content="A comprehensive training hub built to help you play better on the sand." />
+  <style>
+    :root{
+      --paper:#f4f1e8;
+      --paper-2:#ebe6da;
+      --ink:#0d0d0d;
+      --muted:#68665f;
+      --line:rgba(13,13,13,.105);
+      --line-strong:rgba(13,13,13,.72);
+      --lime:#caff35;
+      --lime-soft:rgba(202,255,53,.22);
+      --blue:#2154ff;
+      --blue-soft:rgba(33,84,255,.12);
+      --white:#fffdf6;
+      --shadow:0 18px 60px rgba(15,14,10,.12);
+      --radius:28px;
+      --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+      --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      --display:"Arial Narrow","Roboto Condensed","Helvetica Neue Condensed",Impact,var(--sans);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--ink);
+      background:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg,var(--line) 1px, transparent 1px),
+        var(--paper);
+      background-size:96px 96px;
+      font-family:var(--sans);
+      min-height:100vh;
+    }
+    body::selection{background:var(--lime);color:var(--ink)}
+    a{color:inherit;text-decoration:none}
+    button,input,select,textarea{font:inherit;color:inherit}
+    button{cursor:pointer}
+    .shell{width:min(1180px,calc(100% - 34px));margin-inline:auto}
+    .topbar{
+      position:sticky;top:0;z-index:50;
+      backdrop-filter:blur(18px);
+      background:rgba(244,241,232,.82);
+      border-bottom:1px solid var(--line);
+    }
+    .topbar-inner{
+      display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:22px;
+      min-height:68px;
+    }
+    .brand{
+      display:flex;align-items:center;gap:9px;
+      font-family:var(--display);
+      letter-spacing:-.055em;
+      font-size:23px;
+      line-height:.9;
+      text-transform:uppercase;
+    }
+    .brand-mark{
+      width:27px;height:27px;border:1.5px solid var(--ink);border-radius:999px;
+      display:grid;place-items:center;background:var(--lime);font-family:var(--mono);font-size:12px;letter-spacing:-.08em;
+    }
+    .mini-nav{display:flex;align-items:center;justify-content:center;gap:20px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:-.05em;color:#222}
+    .mini-nav a{position:relative;padding:6px 0;color:var(--muted)}
+    .mini-nav a:hover,.mini-nav a[aria-current="page"]{color:var(--ink)}
+    .mini-nav a::before{content:"";position:absolute;left:-8px;top:50%;width:4px;height:4px;border-radius:50%;background:var(--lime);opacity:0;transform:translateY(-50%)}
+    .mini-nav a[aria-current="page"]::before{opacity:1}
+    .join-pill{
+      border:1px solid var(--line-strong);border-radius:999px;background:transparent;padding:10px 15px;
+      font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em;
+      display:inline-flex;gap:8px;align-items:center;
+    }
+    .join-pill:hover{background:var(--lime)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);display:inline-block;box-shadow:0 0 0 4px rgba(202,255,53,.24)}
+    main{padding:28px 0 72px}
+    .page{display:none;animation:rise .35s ease both}
+    .page.active{display:block}
+    @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .hero{min-height:calc(100vh - 100px);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:34px;align-items:center;padding:42px 0 60px;position:relative}
+    .eyebrow{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:-.04em;color:var(--muted);display:flex;align-items:center;gap:8px;margin:0 0 16px}
+    h1,h2,h3{font-family:var(--display);text-transform:uppercase;letter-spacing:-.075em;margin:0;line-height:.86;font-weight:600}
+    h1{font-size:clamp(62px,11vw,156px);max-width:790px}
+    h2{font-size:clamp(46px,7.6vw,104px)}
+    h3{font-size:clamp(28px,4vw,48px);letter-spacing:-.06em}
+    .outline-word{color:transparent;-webkit-text-stroke:1.4px var(--ink);text-stroke:1.4px var(--ink)}
+    .hero-copy{font-size:clamp(16px,2vw,22px);line-height:1.25;max-width:690px;margin:24px 0 0;color:#24231f}
+    .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+    .button{
+      border:1px solid var(--ink);border-radius:999px;background:var(--ink);color:var(--paper);padding:13px 18px;
+      font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:-.05em;display:inline-flex;align-items:center;gap:10px;
+      min-height:44px;
+    }
+    .button.secondary{background:transparent;color:var(--ink)}
+    .button.blue{background:var(--blue);border-color:var(--blue);color:white}
+    .button:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(0,0,0,.12)}
+    .arrow-circle{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--lime);color:var(--ink)}
+    .hero-art{
+      min-height:580px;border:1px solid var(--line-strong);border-radius:var(--radius);background:rgba(255,253,246,.33);position:relative;overflow:hidden;box-shadow:var(--shadow)
+    }
+    .hero-art::before{
+      content:"";position:absolute;inset:0;background:
+      linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+      background-size:64px 64px;opacity:.85
+    }
+    .hero-art svg{position:absolute;inset:0;width:100%;height:100%}
+    .stamp{
+      position:absolute;left:28px;bottom:28px;right:28px;border-top:1px solid var(--line-strong);padding-top:14px;
+      display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:-.05em;z-index:2
+    }
+    .big-number{font-family:var(--display);font-size:clamp(72px,8vw,112px);letter-spacing:-.09em;line-height:.78}
+    .goal-marquee{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);margin:12px 0 56px;overflow:hidden;background:rgba(255,253,246,.28)}
+    .goal-marquee-track{display:flex;width:max-content;animation:scroll 34s linear infinite}
+    .goal-marquee span{display:inline-flex;align-items:center;gap:18px;white-space:nowrap;padding:13px 20px;font-family:var(--display);font-size:34px;text-transform:uppercase;letter-spacing:-.065em}
+    .goal-marquee b{width:12px;height:12px;border-radius:50%;background:var(--lime);display:inline-block}
+    @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .section-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,360px);gap:22px;align-items:end;margin:40px 0 22px}
+    .section-head p{margin:0;color:var(--muted);line-height:1.35;font-size:14px}
+    .program-strip{border-top:1px solid var(--ink);margin:18px 0 72px}
+    .program-row{
+      display:grid;grid-template-columns:minmax(200px,.8fr) minmax(180px,1fr) auto;align-items:center;gap:18px;
+      border-bottom:1px solid var(--ink);min-height:82px;padding:0 0 0 0;transition:.2s ease;position:relative;overflow:hidden
+    }
+    .program-row::after{content:"";position:absolute;inset:0;background:var(--lime);transform:translateX(-101%);transition:.28s ease;z-index:-1}
+    .program-row:nth-child(2)::after,.program-row:nth-child(5)::after{background:var(--blue)}
+    .program-row:hover::after{transform:translateX(0)}
+    .program-row:hover{color:var(--ink)}
+    .program-row:nth-child(2):hover,.program-row:nth-child(5):hover{color:white}
+    .program-title{font-family:var(--display);font-size:clamp(38px,6vw,72px);letter-spacing:-.075em;line-height:.82;text-transform:uppercase}
+    .program-meta{font-family:var(--mono);font-size:11px;line-height:1.25;text-transform:uppercase;letter-spacing:-.05em;max-width:390px;color:inherit;opacity:.82}
+    .program-arrow{width:36px;height:36px;border:1px solid currentColor;border-radius:999px;display:grid;place-items:center;margin-right:12px;background:var(--lime);color:var(--ink)}
+    .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 72px}
+    .info-card,.panel,.drill-card,.workout-card,.ref-card,.warm-card{
+      border:1px solid var(--line-strong);border-radius:24px;background:rgba(255,253,246,.42);box-shadow:0 8px 30px rgba(0,0,0,.045)
+    }
+    .info-card{min-height:210px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+    .info-card:nth-child(2){background:var(--lime-soft)}
+    .info-card:nth-child(3){background:var(--blue-soft)}
+    .info-card .num{font-family:var(--display);font-size:68px;line-height:.78;letter-spacing:-.085em}
+    .info-card p{margin:0;font-family:var(--mono);font-size:11px;line-height:1.25;text-transform:uppercase;letter-spacing:-.05em;color:#302f29}
+    .page-hero{padding:44px 0 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,410px);gap:28px;align-items:end;border-bottom:1px solid var(--ink);margin-bottom:26px}
+    .page-hero p{margin:14px 0 0;color:var(--muted);line-height:1.35;max-width:680px}
+    .route-chip{border:1px solid var(--ink);border-radius:999px;padding:9px 12px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em;background:var(--lime);justify-self:end}
+    .two-col{display:grid;grid-template-columns:minmax(0,.95fr) minmax(280px,.75fr);gap:18px;align-items:start}
+    .panel{padding:20px}
+    .panel-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;border-bottom:1px solid var(--line-strong);padding-bottom:12px}
+    .panel-title h3{font-size:32px;letter-spacing:-.06em}
+    .micro{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em;color:var(--muted);line-height:1.25}
+    form{display:grid;gap:14px}
+    .field-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .field{display:grid;gap:6px}
+    label,.label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.04em;color:#37352f}
+    input,select,textarea{
+      width:100%;border:1px solid var(--line-strong);background:rgba(255,253,246,.65);border-radius:14px;padding:12px;outline:none;
+    }
+    input:focus,select:focus,textarea:focus{box-shadow:0 0 0 4px var(--lime-soft);border-color:var(--ink)}
+    textarea{min-height:88px;resize:vertical}
+    input[type="range"]{padding:0;accent-color:var(--blue);height:32px;background:transparent;border:0}
+    .activity-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .activity-heading{grid-column:1/-1;font-family:var(--display);font-size:24px;letter-spacing:-.06em;text-transform:uppercase;border-top:1px solid var(--line-strong);padding-top:10px;margin-top:4px}
+    .choice{border:1px solid var(--line-strong);border-radius:16px;padding:11px 12px;display:flex;align-items:center;gap:8px;background:rgba(255,253,246,.5);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em}
+    .choice input{width:auto;accent-color:var(--blue)}
+    .choice:has(input:checked){background:var(--lime);color:var(--ink)}
+    .save-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px}
+    .button.small{padding:10px 13px;min-height:38px;font-size:10px}
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+    .cal-head{font-family:var(--mono);font-size:9px;text-transform:uppercase;color:var(--muted);text-align:center;padding:4px}
+    .cal-day{min-height:74px;border:1px solid var(--line);border-radius:14px;background:rgba(255,253,246,.32);padding:8px;display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+    .cal-day.blank{opacity:.28}
+    .cal-day.logged{background:var(--lime-soft);border-color:rgba(13,13,13,.55)}
+    .cal-day.today{outline:2px solid var(--blue);outline-offset:1px}
+    .cal-num{font-family:var(--mono);font-size:10px;color:var(--muted)}
+    .cal-badge{display:inline-flex;width:18px;height:18px;border-radius:999px;align-items:center;justify-content:center;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9px}
+    .summary-stack{display:grid;gap:10px}
+    .summary-card{border:1px solid var(--line-strong);border-radius:18px;padding:14px;background:rgba(255,253,246,.38);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+    .summary-card b{font-family:var(--display);font-size:36px;letter-spacing:-.07em;line-height:.8}
+    .plan-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:16px}
+    .day-card{border:1px solid var(--line-strong);border-radius:20px;background:rgba(255,253,246,.42);padding:14px;min-height:230px;display:flex;flex-direction:column;gap:12px}
+    .day-card strong{font-family:var(--display);font-size:31px;letter-spacing:-.07em;text-transform:uppercase;line-height:.85}
+    .day-card em{font-style:normal;font-family:var(--mono);font-size:10px;line-height:1.25;color:var(--muted);text-transform:uppercase;letter-spacing:-.05em}
+    .day-card ul,.warm-card ul,.workout-card ul,.ref-card ul{padding-left:18px;margin:0;line-height:1.45;color:#2d2b26}
+    .day-card li{margin-bottom:6px}
+    .day-card:nth-child(2),.day-card:nth-child(5){background:var(--lime-soft)}
+    .day-card:nth-child(4){background:var(--blue-soft)}
+    .taper{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+    .taper .panel{min-height:180px}
+    .checkline{display:flex;gap:9px;align-items:flex-start;margin:10px 0;font-size:14px;line-height:1.3}
+    .checkline input{width:auto;margin-top:2px;accent-color:var(--blue)}
+    .filters{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 20px}
+    .filter-btn{border:1px solid var(--ink);background:transparent;border-radius:999px;padding:10px 13px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em}
+    .filter-btn.active,.filter-btn:hover{background:var(--lime)}
+    .drill-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .drill-card{padding:16px;min-height:250px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden}
+    .drill-card::before{content:attr(data-skill-label);position:absolute;right:12px;top:12px;font-family:var(--mono);font-size:9px;letter-spacing:-.05em;text-transform:uppercase;background:var(--lime);padding:6px 8px;border-radius:999px;border:1px solid var(--ink)}
+    .drill-card[data-skill="defense"]::before,.drill-card[data-skill="jump"]::before{background:var(--blue);color:white;border-color:var(--blue)}
+    .drill-card h3{font-size:34px;max-width:78%}
+    .drill-card p{margin:0;color:#32312b;line-height:1.35;font-size:14px}
+    .drill-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+    .tag{border:1px solid var(--line-strong);border-radius:999px;padding:6px 8px;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:-.05em;background:rgba(255,253,246,.55)}
+    .warm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .warm-card{padding:18px;min-height:230px}
+    .warm-card h3,.workout-card h3,.ref-card h3{font-size:34px;margin-bottom:12px}
+    .warm-card p,.workout-card p,.ref-card p{margin:0 0 12px;color:#36342e;line-height:1.35}
+    .workout-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.72fr);gap:18px;align-items:start}
+    .workout-grid{display:grid;gap:12px}
+    .workout-card{padding:18px}
+    .exercise-list{display:grid;gap:8px;margin:12px 0}
+    .exercise-link{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:8px;font-size:14px}
+    .exercise-link a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+    .exercise-link a:hover{background:var(--lime)}
+    .reference-library{display:grid;gap:12px}
+    .ref-card{padding:16px;scroll-margin-top:96px;background:rgba(255,253,246,.55)}
+    .ref-card:target{outline:3px solid var(--lime);outline-offset:2px}
+    .footer{border-top:1px solid var(--ink);padding:24px 0 10px;margin-top:60px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+    .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--paper);border-radius:999px;padding:12px 16px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:-.05em;z-index:100;transition:.25s ease;box-shadow:var(--shadow)}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .notice{border:1px solid var(--line-strong);border-radius:18px;padding:14px;background:var(--lime-soft);font-size:13px;line-height:1.35;color:#2b2a25}
+    .empty-state{border:1px dashed var(--line-strong);border-radius:18px;padding:18px;text-align:center;color:var(--muted);font-size:14px}
+    .mobile-program{display:none}
+    @media (max-width: 980px){
+      .topbar-inner{grid-template-columns:auto auto;justify-content:space-between}.mini-nav{grid-column:1/-1;justify-content:flex-start;overflow:auto;padding-bottom:10px}.join-pill{display:none}
+      .hero,.page-hero,.two-col,.section-head,.workout-layout{grid-template-columns:1fr}.hero-art{min-height:430px}.route-chip{justify-self:start}.info-grid,.taper{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(2,1fr)}.drill-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width: 680px){
+      .shell{width:min(100% - 22px,1180px)}main{padding-top:14px}h1{font-size:60px}.hero{padding-top:22px}.hero-art{min-height:360px;border-radius:22px}.hero-copy{font-size:16px}.program-row{grid-template-columns:1fr auto;gap:10px;padding:12px 0}.program-meta{grid-column:1/-1}.program-title{font-size:42px}.info-grid,.field-grid,.activity-grid,.plan-grid,.drill-grid,.warm-grid,.taper{grid-template-columns:1fr}.page-hero{padding-top:28px}.cal-day{min-height:58px}.brand{font-size:21px}.mini-nav{gap:14px}.goal-marquee span{font-size:27px}.stamp{left:18px;right:18px;bottom:18px}.workout-layout{display:block}.reference-library{margin-top:14px}
+    }
+  </style>
 </head>
 <body>
-<header><div class="wrap"><h1>Beach Volleyball Training Plan</h1><p class="muted">Defender-focused tracker for jump height, endurance, safer diving, and flexible weeks with optional class slots + 1–2 tennis nights.</p><div class="pillrow"><span class="pill">🏐 Defender</span><span class="pill">⚡ Jump: ~44 cm</span><span class="pill">🎾 Tennis included</span><span class="pill">📅 Flexible schedule</span></div></div></header>
-<nav class="topnav"><div class="wrap"><button class="tab active" data-page="track">Track</button><button class="tab" data-page="plan">Plan</button><button class="tab" data-page="workouts">Workouts & References</button></div></nav>
-<main class="wrap">
-<section id="track" class="page active"><h2>Track</h2><div class="subnav"><button class="subtab active" data-group="track" data-section="checkin">Daily check-in</button><button class="subtab" data-group="track" data-section="log">Daily log</button><button class="subtab" data-group="track" data-section="progress">Progress tracker</button></div>
-<div id="checkin" class="section active" data-group="track"><div class="card"><h3>Daily readiness check</h3><p class="muted">If three or more scores are poor, cut volume or switch to prehab/mobility.</p><div class="formgrid"><div><label>Date</label><input id="checkDate" type="date"></div><div><label>Sleep</label><select id="sleep"><option>Good</option><option>Okay</option><option>Poor</option></select></div><div><label>Leg soreness</label><select id="legs"><option>Fresh</option><option>Manageable</option><option>Poor</option></select></div><div><label>Joint pain</label><select id="joints"><option>None</option><option>Mild</option><option>Poor</option></select></div></div><div class="formgrid"><div><label>Energy</label><select id="energy"><option>Good</option><option>Okay</option><option>Poor</option></select></div><div><label>Motivation</label><select id="motivation"><option>Good</option><option>Okay</option><option>Poor</option></select></div><div><label>Hydration</label><select id="hydrationReadiness"><option>Good</option><option>Could be better</option><option>Poor</option></select></div><div><label>Recommendation</label><input id="recommendation" readonly value="Ready"></div></div><button id="saveCheckin" class="btn primary">Save check-in</button></div><div class="card good"><h3>Rule of thumb</h3><p>Sharp/worsening joint pain = stop that movement. Training around pain is smart; pretending the elbow is just being “dramatic” is how elbows win.</p></div></div>
-<div id="log" class="section" data-group="track"><div class="card"><h3>Daily workout / activity log</h3><div class="formgrid"><div><label>Date</label><input id="logDate" type="date"></div><div><label>Activity type</label><select id="activity"><option>Strength A</option><option>Strength B</option><option>Prehab</option><option>Drills</option><option>2v2 Games</option><option>Casual Games / 3v3 / 4v4</option><option>Coached Beach Class</option><option>Tennis</option><option>Tournament</option><option>Rest / Mobility</option><option>Other</option></select></div><div><label>Duration</label><input id="duration" placeholder="e.g. 60 min, 3 hrs"></div><div><label>Intensity</label><select id="rpe"><option>Easy</option><option>Moderate</option><option>Hard</option><option>Very hard</option></select></div></div><div class="formgrid"><div><label>Status</label><select id="status"><option value="done">Completed</option><option value="partial">Partial / Modified</option><option value="rest">Rest / Recovery</option></select></div><div><label>Jump load</label><input id="jumpLoad" placeholder="low / medium / high"></div><div><label>Soreness / pain</label><input id="soreness" placeholder="e.g. calves 3/10"></div><div><label>Hydration</label><input id="hydration" placeholder="e.g. 2L + electrolytes"></div></div><label>Notes</label><textarea id="notes" placeholder="Class unavailable, tennis replaced gym, modified exercises, etc."></textarea><div class="pillrow"><button id="saveLog" class="btn primary">Save daily log</button><button id="clearForm" class="btn secondary">Clear form</button><button id="exportCsv" class="btn secondary">Export logs CSV</button></div></div><div class="card"><h3>Selected day</h3><div id="selectedDay" class="muted">Select a date or save a log.</div></div></div>
-<div id="progress" class="section" data-group="track"><div class="card"><div class="calendar-head"><h3 id="monthTitle">Calendar</h3><div><button id="prevMonth" class="btn secondary">← Previous</button><button id="todayMonth" class="btn secondary">Today</button><button id="nextMonth" class="btn secondary">Next →</button></div></div><div class="legend"><span><i class="dot" style="background:var(--green)"></i>Completed</span><span><i class="dot" style="background:var(--sun)"></i>Partial</span><span><i class="dot" style="background:#98a2b3"></i>Rest</span></div><div id="calendar" class="calendar"></div></div><div class="card"><h3>Month summary</h3><div id="summary" class="miniwrap"></div></div></div></section>
-<section id="plan" class="page"><h2>Plan</h2><div class="subnav"><button class="subtab active" data-group="plan" data-section="weekly">Weekly plan</button><button class="subtab" data-group="plan" data-section="taper">Tournament taper</button></div><div id="weekly" class="section active" data-group="plan"><div class="card"><h3>Flexible weekly structure</h3><table><tr><th>Day</th><th>Default</th><th>Flex rule</th></tr><tr><td>Mon lunch</td><td>Strength A</td><td>If weekend soreness is high, switch to prehab/mobility.</td></tr><tr><td>Mon night</td><td>Beach casual games</td><td>Keep moderate if Strength A was hard.</td></tr><tr><td>Tue</td><td>Tennis or beach/pepper</td><td>Tennis counts as lower-limb + elbow load.</td></tr><tr><td>Wed night</td><td>Strength B option</td><td>If tennis/class happens, move Strength B to Thu.</td></tr><tr><td>Thu night</td><td>Strength B or coached beach class</td><td>Coached class is slot-dependent, not guaranteed.</td></tr><tr><td>Fri</td><td>Rest / mobility</td><td>Protect weekend legs.</td></tr><tr><td>Sat</td><td>AM drills + 2v2, PM casual games</td><td>Main load day; fuel and hydrate.</td></tr><tr><td>Sun</td><td>Casual games + drills</td><td>Make technical if Saturday was hard.</td></tr></table></div><div class="card warn"><h3>Flex rules</h3><ul><li>Minimum weekly target: 1 lower-body strength session + 1 power/prehab session.</li><li>Do not stack hard tennis + hard beach + Strength B on back-to-back nights if soreness is rising.</li><li>If court/class slots fall through, use the condensed workout or prehab.</li></ul></div></div><div id="taper" class="section" data-group="plan"><div class="card"><h3>Tournament taper</h3><table><tr><th>Timing</th><th>Do</th><th>Avoid</th></tr><tr><td>3–4 days out</td><td>Light-moderate skills, serve receive, short 2v2.</td><td>Heavy legs, max jumps, endless diving.</td></tr><tr><td>1–2 days out</td><td>20-minute primer, mobility, easy jumps.</td><td>Fatigue-chasing. Not cute.</td></tr><tr><td>Game day</td><td>Dynamic warm-up, progressive jumps, fluids + carbs.</td><td>Standing cold or forgetting snacks.</td></tr></table></div></div></section>
-<section id="workouts" class="page"><h2>Workouts & References</h2><div class="subnav"><button class="subtab active" data-group="workouts" data-section="workoutMenu">Workouts</button><button class="subtab" data-group="workouts" data-section="refs">Exercise references</button></div><div id="workoutMenu" class="section active" data-group="workouts"><div class="grid two"><div class="card"><h3>Strength A — Jump foundation</h3><ol class="workout-list"><li><a class="exercise-link" href="#ref-squat">Squat pattern</a> — 4 × 5–6</li><li><a class="exercise-link" href="#ref-rdl">Romanian deadlift</a> — 3 × 8</li><li><a class="exercise-link" href="#ref-bss">Bulgarian split squat</a> — 3 × 8 each</li><li><a class="exercise-link" href="#ref-hip-thrust">Hip thrust / glute bridge</a> — 3 × 10</li><li><a class="exercise-link" href="#ref-calf-raise">Standing calf raise</a> — 3 × 12–15</li><li><a class="exercise-link" href="#ref-tibialis">Tibialis raise</a> — 3 × 15–20</li></ol></div><div class="card"><h3>Strength B — Power + prehab</h3><ol class="workout-list"><li><a class="exercise-link" href="#ref-approach-jump">Approach jumps</a> — 4 × 3</li><li><a class="exercise-link" href="#ref-lateral-bound">Lateral bounds</a> — 3 × 5 each</li><li><a class="exercise-link" href="#ref-push-up">Push-ups</a> — 3 × 8–12</li><li><a class="exercise-link" href="#ref-pull-up">Pull-ups / band rows</a> — 3 × 6–10</li><li><a class="exercise-link" href="#ref-single-rdl">Single-leg RDL</a> — 3 × 8 each</li><li><a class="exercise-link" href="#ref-external-rotation">Band external rotation</a> + <a class="exercise-link" href="#ref-face-pull">face pull</a></li></ol></div></div><div class="grid two"><div class="card"><h3>Sand defender speed block</h3><ol class="workout-list"><li><a class="exercise-link" href="#ref-split-step">Split-step reaction</a> — 4 × 45 sec</li><li><a class="exercise-link" href="#ref-short-ball">Short-ball pickup</a> — 4 × 6</li><li><a class="exercise-link" href="#ref-deep-chase">Deep line / angle chase</a> — 4 × 5</li><li><a class="exercise-link" href="#ref-sprawl">Controlled sprawl progression</a> — 3 × 5 each</li></ol></div><div class="card"><h3>Condensed 30-minute option</h3><ol class="workout-list"><li><a class="exercise-link" href="#ref-approach-jump">Approach jumps</a> — 4 × 3</li><li><a class="exercise-link" href="#ref-bss">Bulgarian split squat</a> — 3 × 8 each</li><li><a class="exercise-link" href="#ref-rdl">RDL</a> or <a class="exercise-link" href="#ref-single-rdl">single-leg RDL</a> — 3 × 8</li><li><a class="exercise-link" href="#ref-calf-raise">Calf raise</a> + <a class="exercise-link" href="#ref-tibialis">tibialis raise</a></li></ol></div></div></div><div id="refs" class="section" data-group="workouts"><div class="card"><h3>Exercise references</h3><p class="muted">Click exercise names in workouts to jump directly here. External videos open in a new tab.</p><div id="quickRefs" class="quick-links"></div></div><div id="refsContainer"></div></div></section>
-<footer>Data saves locally in your browser. GitHub Pages hosting is fine for this single-file site.</footer>
-</main><div id="toast" class="toast">Saved</div>
-<script>
-(function(){'use strict';const KEY='bvLogsV7', CK='bvCheckinsV7', mem={};const $=id=>document.getElementById(id);function todayISO(){return new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}function toast(m,t){const el=$('toast');el.textContent=m;el.className='toast show '+(t||'');setTimeout(()=>el.className='toast '+(t||''),2200)}function get(k,f){try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(f))}catch(e){return mem[k]||f}}function set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){mem[k]=v;return false}}function logs(){return get(KEY,{})}function saveLogs(v){return set(KEY,v)}['logDate','checkDate'].forEach(id=>{if($(id))$(id).value=todayISO()});
-function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.page===id));if(id==='track')renderCal()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showPage(b.dataset.page));document.querySelectorAll('.subtab').forEach(b=>b.onclick=()=>{const g=b.dataset.group,s=b.dataset.section;document.querySelectorAll('.section[data-group="'+g+'"]').forEach(x=>x.classList.toggle('active',x.id===s));document.querySelectorAll('.subtab[data-group="'+g+'"]').forEach(x=>x.classList.toggle('active',x===b));if(s==='progress')renderCal()});
-function readiness(){let vals=[$('sleep').value,$('legs').value,$('joints').value,$('energy').value,$('motivation').value,$('hydrationReadiness').value];let poor=vals.filter(v=>v==='Poor').length;let rec=poor>=3?'Reduce load / recovery':poor===2?'Cut volume ~25%':poor===1?'Proceed, monitor':'Ready';if($('joints').value==='Poor')rec='Avoid painful movements';$('recommendation').value=rec;return rec}['sleep','legs','joints','energy','motivation','hydrationReadiness'].forEach(id=>$(id).onchange=readiness);$('saveCheckin').onclick=()=>{let d=$('checkDate').value||todayISO(), data=get(CK,{});data[d]={date:d,sleep:$('sleep').value,legs:$('legs').value,joints:$('joints').value,energy:$('energy').value,motivation:$('motivation').value,hydration:$('hydrationReadiness').value,recommendation:readiness()};let ok=set(CK,data);toast(ok?'Check-in saved':'Check-in saved temporarily','warn')};
-$('saveLog').onclick=()=>{let l={date:$('logDate').value||todayISO(),activity:$('activity').value,duration:$('duration').value.trim(),rpe:$('rpe').value,status:$('status').value,jumpLoad:$('jumpLoad').value.trim(),soreness:$('soreness').value.trim(),hydration:$('hydration').value.trim(),notes:$('notes').value.trim(),savedAt:new Date().toISOString()};let data=logs();if(!data[l.date])data[l.date]=[];data[l.date].push(l);let ok=saveLogs(data);renderCal();showDay(l.date);toast(ok?'Log saved':'Log saved temporarily — browser storage blocked','warn')};$('clearForm').onclick=()=>{['duration','jumpLoad','soreness','hydration','notes'].forEach(id=>$(id).value='');$('status').value='done';$('rpe').value='Easy';toast('Form cleared')};$('exportCsv').onclick=()=>{let rows=[['date','activity','duration','rpe','status','jumpLoad','soreness','hydration','notes','savedAt']],data=logs();Object.keys(data).sort().forEach(d=>data[d].forEach(l=>rows.push([l.date,l.activity,l.duration,l.rpe,l.status,l.jumpLoad,l.soreness,l.hydration,l.notes,l.savedAt])));let csv=rows.map(r=>r.map(x=>'"'+String(x||'').replace(/"/g,'""')+'"').join(',')).join('\n'),blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='beach-volleyball-training-log.csv';a.click();URL.revokeObjectURL(a.href)};
-let cur=new Date();cur.setDate(1);function cls(arr){if(!arr||!arr.length)return'';if(arr.some(l=>l.status==='done'))return'done';if(arr.some(l=>l.status==='partial'))return'partial';return'rest'}function renderCal(){let grid=$('calendar'),data=logs();if(!grid)return;let y=cur.getFullYear(),m=cur.getMonth();$('monthTitle').textContent=cur.toLocaleString(undefined,{month:'long',year:'numeric'});grid.innerHTML='';['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d=>{let e=document.createElement('div');e.className='dow';e.textContent=d;grid.appendChild(e)});let first=new Date(y,m,1),off=(first.getDay()+6)%7;for(let i=0;i<off;i++){let e=document.createElement('div');e.className='day empty';grid.appendChild(e)}let days=new Date(y,m+1,0).getDate();for(let d=1;d<=days;d++){let iso=new Date(y,m,d,12).toISOString().slice(0,10),arr=data[iso]||[],e=document.createElement('button');e.type='button';e.className='day '+cls(arr);e.innerHTML='<div class="num">'+d+'</div>'+(arr.length?'<div class="tiny">'+arr.length+' log'+(arr.length>1?'s':'')+'</div><div class="tiny">'+esc(arr.map(x=>x.activity).slice(-2).join(', '))+'</div>':'');e.onclick=()=>{$('logDate').value=iso;showDay(iso);document.querySelector('[data-section="log"]').click()};grid.appendChild(e)}summary()}function showDay(d){let arr=logs()[d]||[],box=$('selectedDay');if(!arr.length){box.innerHTML='<b>'+d+'</b><br>No logs yet.';return}box.innerHTML='<b>'+d+'</b>'+arr.map(l=>'<div class="card" style="box-shadow:none;margin:10px 0;padding:12px"><b>'+esc(l.activity)+'</b> · '+esc(l.rpe)+' · '+esc(l.status)+'<br><span class="muted">'+esc(l.duration||'No duration')+'</span><br>'+esc(l.notes||'')+'</div>').join('')}function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}function summary(){let data=logs(),pre=cur.toISOString().slice(0,7),n=0,str=0,bv=0,ten=0;Object.keys(data).forEach(d=>{if(d.startsWith(pre))data[d].forEach(l=>{n++;if(l.activity.includes('Strength'))str++;if(['Drills','2v2 Games','Casual Games / 3v3 / 4v4','Coached Beach Class','Tournament'].includes(l.activity))bv++;if(l.activity==='Tennis')ten++})});$('summary').innerHTML='<div class="mini"><b>'+n+'</b><br><span class="muted">logs this month</span></div><div class="mini"><b>'+str+'</b><br><span class="muted">strength</span></div><div class="mini"><b>'+bv+'</b><br><span class="muted">beach</span></div><div class="mini"><b>'+ten+'</b><br><span class="muted">tennis</span></div>'}$('prevMonth').onclick=()=>{cur.setMonth(cur.getMonth()-1);renderCal()};$('nextMonth').onclick=()=>{cur.setMonth(cur.getMonth()+1);renderCal()};$('todayMonth').onclick=()=>{cur=new Date();cur.setDate(1);renderCal()};
-const refs=[['squat','Squat pattern','Strength base for jumping and landing','Sit between hips, knees track over toes, brace.','https://www.acefitness.org/resources/everyone/exercise-library/135/bodyweight-squat/'],['rdl','Romanian deadlift','Hamstrings and glutes','Push hips back, neutral spine, controlled lowering.','https://www.acefitness.org/resources/everyone/exercise-library/210/romanian-deadlift/'],['bss','Bulgarian split squat','Single-leg strength','Front foot stable, lower under control, knee tracks over toes.','https://www.acefitness.org/resources/everyone/exercise-library/363/rear-foot-elevated-split-squat/'],['hip-thrust','Hip thrust / glute bridge','Glute power','Ribs down, squeeze glutes, avoid over-arching.','https://www.acefitness.org/resources/everyone/exercise-library/280/glute-bridge/'],['calf-raise','Standing calf raise','Ankle stiffness','Rise high, pause, lower slowly.','https://www.acefitness.org/resources/everyone/exercise-library/254/standing-calf-raise/'],['tibialis','Tibialis raise','Shin strength','Lean on wall, lift toes toward shins.','https://www.youtube.com/results?search_query=tibialis+raise+exercise'],['approach-jump','Approach jump','Jump technique','Fast last two steps, full arm swing, land quietly.','https://www.youtube.com/results?search_query=beach+volleyball+approach+jump+technique'],['lateral-bound','Lateral bounds','Defender explosiveness','Push sideways and stick the landing.','https://www.youtube.com/results?search_query=lateral+bound+exercise+proper+form'],['push-up','Push-up','Upper-body control','Straight line, elbows angled, press floor away.','https://www.acefitness.org/resources/everyone/exercise-library/41/push-up/'],['pull-up','Pull-ups / band rows','Back strength','Shoulder blades down/back, avoid shrugging.','https://www.youtube.com/results?search_query=band+row+exercise+proper+form'],['single-rdl','Single-leg RDL','Balance + posterior chain','Hips square, soft knee, reach long.','https://www.youtube.com/results?search_query=single+leg+romanian+deadlift+proper+form'],['external-rotation','Band external rotation','Rotator cuff','Elbow by side, rotate without twisting trunk.','https://www.youtube.com/results?search_query=band+external+rotation+shoulder+exercise'],['face-pull','Band face pull','Scapular control','Pull toward face, elbows high.','https://www.youtube.com/results?search_query=band+face+pull+proper+form'],['split-step','Split-step reaction','First-step speed','Small split as hitter contacts ball, react low.','https://www.youtube.com/results?search_query=beach+volleyball+defense+split+step+drill'],['short-ball','Short-ball pickup','Short ball defense','Sprint first, lower hips, platform early.','https://www.youtube.com/results?search_query=beach+volleyball+short+ball+defense+drill'],['deep-chase','Deep line / angle chase','Deep shot defense','Open hips, run first, platform second.','https://www.youtube.com/results?search_query=beach+volleyball+deep+line+angle+defense+drill'],['sprawl','Controlled sprawl progression','Safer diving','Reach through ball, land on side/forearms.','https://www.youtube.com/results?search_query=beach+volleyball+diving+sprawl+technique']];function icon(){return '<svg viewBox="0 0 100 100" fill="none"><circle cx="50" cy="18" r="10" fill="#2e8f9e"/><path d="M48 30 L38 54 L30 78" stroke="#1f2933" stroke-width="7" stroke-linecap="round"/><path d="M52 30 L64 52 L78 62" stroke="#1f2933" stroke-width="7" stroke-linecap="round"/><path d="M42 46 L23 42" stroke="#ef7a62" stroke-width="7" stroke-linecap="round"/><path d="M56 44 L78 34" stroke="#ef7a62" stroke-width="7" stroke-linecap="round"/><path d="M38 55 L58 72" stroke="#1f2933" stroke-width="7" stroke-linecap="round"/><circle cx="79" cy="26" r="9" fill="#f6b84b"/></svg>'}function renderRefs(){if($('refsContainer').dataset.done)return;$('quickRefs').innerHTML=refs.map(r=>'<a href="#ref-'+r[0]+'">'+r[1]+'</a>').join('');$('refsContainer').innerHTML=refs.map(r=>'<div class="card ref-card" id="ref-'+r[0]+'"><div class="demo">'+icon()+'</div><div><h3>'+r[1]+'</h3><p><b>'+r[2]+'</b><br>'+r[3]+'</p><div class="video-links"><a target="_blank" rel="noopener" href="'+r[4]+'">Open video/reference ↗</a></div><a class="exercise-link" href="#workoutMenu" data-back="1">Back to workouts</a></div></div>').join('');$('refsContainer').dataset.done=1}document.addEventListener('click',e=>{let a=e.target.closest('a[href^="#ref-"]');if(a){e.preventDefault();showPage('workouts');document.querySelector('[data-section="refs"]').click();renderRefs();setTimeout(()=>document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'}),60)}let back=e.target.closest('[data-back]');if(back){e.preventDefault();showPage('workouts');document.querySelector('[data-section="workoutMenu"]').click();}});readiness();renderRefs();renderCal();})();
-</script>
-</body></html>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#home" aria-label="Beach Volleyball Training Hub home"><span class="brand-mark">BV</span><span>SAND<br>LAB</span></a>
+      <nav class="mini-nav" aria-label="Primary">
+        <a href="#home" data-nav="home">About</a>
+        <a href="#track" data-nav="track">Track</a>
+        <a href="#plan" data-nav="plan">Plan</a>
+        <a href="#drills" data-nav="drills">Drills</a>
+        <a href="#warmups" data-nav="warmups">Warmups</a>
+        <a href="#workouts" data-nav="workouts">Workouts</a>
+      </nav>
+      <a class="join-pill" href="#track"><span class="dot"></span> Log today</a>
+    </div>
+  </header>
+
+  <main class="shell" id="app">
+    <section class="page active" data-page="home" aria-labelledby="home-title">
+      <div class="hero">
+        <div>
+          <p class="eyebrow"><span class="dot"></span> Personal beach volleyball program</p>
+          <h1 id="home-title">Beach Volleyball <span class="outline-word">Training</span> Hub</h1>
+          <p class="hero-copy">A comprehensive training hub built to help you play better on the sand. Plan your sessions and track your activity, level up mind body and skills to become the best Beach Volleyballer you can be.</p>
+          <div class="hero-actions">
+            <a class="button blue" href="#plan">Build the week <span class="arrow-circle">↗</span></a>
+            <a class="button secondary" href="#track">Track today <span class="arrow-circle">→</span></a>
+          </div>
+        </div>
+        <div class="hero-art" aria-label="Graphic art of a beach volleyball athlete diving on a court grid">
+          <svg viewBox="0 0 720 760" role="img" aria-labelledby="artTitle">
+            <title id="artTitle">Abstract beach volleyball athlete graphic</title>
+            <defs>
+              <filter id="rough"><feTurbulence baseFrequency="0.015" numOctaves="2" seed="8"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter>
+              <linearGradient id="fade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdf6" stop-opacity=".7"/><stop offset="1" stop-color="#ebe6da" stop-opacity=".15"/></linearGradient>
+            </defs>
+            <rect x="72" y="90" width="480" height="300" rx="36" fill="url(#fade)" stroke="#0d0d0d" stroke-width="2" opacity=".9"/>
+            <rect x="72" y="390" width="480" height="46" fill="#caff35" stroke="#0d0d0d" stroke-width="2"/>
+            <rect x="156" y="500" width="470" height="94" rx="47" fill="#2154ff" opacity=".96"/>
+            <text x="106" y="168" font-family="Arial Narrow, Arial, sans-serif" font-size="76" font-weight="500" letter-spacing="-5" fill="#0d0d0d">SAND</text>
+            <text x="105" y="236" font-family="Arial Narrow, Arial, sans-serif" font-size="76" font-weight="500" letter-spacing="-5" fill="none" stroke="#0d0d0d" stroke-width="1.4">CONTROL</text>
+            <circle cx="548" cy="180" r="31" fill="#caff35" stroke="#0d0d0d" stroke-width="2"/>
+            <path d="M526 160 C550 180 564 183 578 179" fill="none" stroke="#0d0d0d" stroke-width="2" opacity=".6"/>
+            <g transform="translate(144 280) rotate(-12)" stroke="#0d0d0d" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="180" cy="70" r="24" fill="#0d0d0d"/>
+              <path d="M178 100 C150 134 130 159 96 180" stroke-width="25" fill="none"/>
+              <path d="M145 128 C196 158 252 174 314 187" stroke-width="17" fill="none"/>
+              <path d="M106 178 C80 207 55 235 28 266" stroke-width="17" fill="none"/>
+              <path d="M190 145 C180 195 172 230 153 277" stroke-width="18" fill="none"/>
+              <path d="M308 186 C344 172 378 152 406 126" stroke-width="11" fill="none"/>
+              <path d="M31 268 L0 270" stroke-width="9"/>
+              <path d="M153 278 L148 316" stroke-width="9"/>
+            </g>
+            <g filter="url(#rough)" opacity=".82">
+              <path d="M82 604h402v70H82z" fill="#0d0d0d"/>
+              <path d="M106 617h172v16H106z" fill="#caff35"/>
+              <path d="M106 645h258v14H106z" fill="#fffdf6"/>
+            </g>
+            <text x="112" y="644" font-family="SFMono-Regular, Consolas, monospace" font-size="14" fill="#0d0d0d">DIVE SMART / JUMP HIGHER</text>
+            <path d="M620 72v235" stroke="#0d0d0d" stroke-width="2"/>
+            <path d="M608 296l12 12 12-12" fill="none" stroke="#0d0d0d" stroke-width="2"/>
+            <text x="596" y="340" font-family="SFMono-Regular, Consolas, monospace" font-size="11" fill="#0d0d0d" transform="rotate(90 596 340)">SCROLL / TRAIN</text>
+          </svg>
+          <div class="stamp"><span>Built for sand court sessions, partner training, tournament taper and daily accountability.</span><span class="big-number">04</span></div>
+        </div>
+      </div>
+
+      <div class="goal-marquee" aria-label="Personal goals">
+        <div class="goal-marquee-track">
+          <span><b></b>Solid Defense</span><span><b></b>Higher Jumps</span><span><b></b>Endurance</span><span><b></b>Diving without injury</span>
+          <span><b></b>Solid Defense</span><span><b></b>Higher Jumps</span><span><b></b>Endurance</span><span><b></b>Diving without injury</span>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Program Strip</h2>
+        <p>Navigate like an editorial sports-club site: big strips, sharp contrast, no dashboard-tab déjà vu. Your old layout has officially been benched.</p>
+      </div>
+      <nav class="program-strip" aria-label="Program sections">
+        <a class="program-row" href="#track"><span class="program-title">Track</span><span class="program-meta">Daily check-in, hydration, multi-select activity log, progress calendar.</span><span class="program-arrow">→</span></a>
+        <a class="program-row" href="#plan"><span class="program-title">Plan</span><span class="program-meta">Weekly plan, skill emphasis and tournament taper without panic-rearranging your entire life.</span><span class="program-arrow">→</span></a>
+        <a class="program-row" href="#drills"><span class="program-title">Drills</span><span class="program-meta">Skill-set filters for passing, defense, serving, attack, ball control and game situations.</span><span class="program-arrow">→</span></a>
+        <a class="program-row" href="#warmups"><span class="program-title">Warmups</span><span class="program-meta">Sand-ready prep, shoulder care, hip mobility and diving-safe landing habits.</span><span class="program-arrow">→</span></a>
+        <a class="program-row" href="#workouts"><span class="program-title">Workouts</span><span class="program-meta">Jump, endurance and durability sessions with direct links to exercise references.</span><span class="program-arrow">→</span></a>
+      </nav>
+
+      <div class="section-head">
+        <h2>Personal Goals</h2>
+        <p>The whole hub is oriented around four beach volleyball outcomes: read the game better, jump higher, last longer, and hit the sand without donating skin to the court.</p>
+      </div>
+      <div class="info-grid">
+        <div class="info-card"><span class="num">01</span><p>Solid defense: read, hold, dig, reset. Less guessing, more annoying your opponents.</p></div>
+        <div class="info-card"><span class="num">02</span><p>Higher jumps: elastic ankles, stronger hips, cleaner approach rhythm.</p></div>
+        <div class="info-card"><span class="num">03</span><p>Endurance: repeat rallies, sand legs, tournament-day energy management.</p></div>
+        <div class="info-card"><span class="num">04</span><p>Diving without injury: controlled take-off, slide, shoulder position and recovery.</p></div>
+      </div>
+    </section>
+
+    <section class="page" data-page="track" aria-labelledby="track-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Logbook</p><h2 id="track-title">Track</h2><p>Use this as your daily sand diary: quick check-in, hydration level, activity multi-select and a calendar that shows whether your week is actually training or just vibes in athletic clothing.</p></div>
+        <span class="route-chip">LocalStorage enabled</span>
+      </div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-title"><h3>Daily Check-In</h3><span class="micro" id="storageStatus">Checking storage…</span></div>
+          <form id="dailyForm">
+            <div class="field-grid">
+              <div class="field"><label for="logDate">Date</label><input id="logDate" name="logDate" type="date" required /></div>
+              <div class="field"><label for="sleepHours">Sleep hours</label><input id="sleepHours" name="sleepHours" type="number" min="0" max="14" step="0.25" placeholder="7" /></div>
+              <div class="field"><label for="energy">Energy <span id="energyLabel">3</span>/5</label><input id="energy" name="energy" type="range" min="1" max="5" value="3" /></div>
+              <div class="field"><label for="soreness">Soreness <span id="sorenessLabel">2</span>/5</label><input id="soreness" name="soreness" type="range" min="1" max="5" value="2" /></div>
+              <div class="field"><label for="hydration">Hydration level <span id="hydrationLabel">Good</span></label><input id="hydration" name="hydration" type="range" min="1" max="5" value="4" /></div>
+              <div class="field"><label for="focusSkill">Focus skill</label><select id="focusSkill" name="focusSkill"><option>Defense</option><option>Jumping</option><option>Endurance</option><option>Diving</option><option>Serving</option><option>Passing</option><option>Attack</option><option>Recovery</option></select></div>
+            </div>
+            <div class="field">
+              <span class="label">Daily log — choose multiple activities</span>
+              <div class="activity-grid" id="activityGrid">
+                <div class="activity-heading">Beach Volleyball</div>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Strength A">Strength A</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Strength B">Strength B</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — 2v2 games">2v2 games</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Drills">Drills</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Casual 3v3 / 4v4">Casual 3v3 / 4v4</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Coached session">Coached session</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Tournament">Tournament</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Beach Volleyball — Recovery skills">Recovery skills</label>
+                <div class="activity-heading">Other Training</div>
+                <label class="choice"><input type="checkbox" name="activities" value="Tennis">Tennis</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Gym / weights">Gym / weights</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Run / cardio">Run / cardio</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Mobility / prehab">Mobility / prehab</label>
+                <label class="choice"><input type="checkbox" name="activities" value="Rest">Rest</label>
+              </div>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label for="duration">Total training minutes</label><input id="duration" name="duration" type="number" min="0" step="5" placeholder="90" /></div>
+              <div class="field"><label for="rating">Session rating <span id="ratingLabel">3</span>/5</label><input id="rating" name="rating" type="range" min="1" max="5" value="3" /></div>
+            </div>
+            <div class="field"><label for="notes">Notes</label><textarea id="notes" name="notes" placeholder="What felt strong? What needs work? Any hydration, jump, defense or diving notes?"></textarea></div>
+            <div class="save-row">
+              <button class="button blue small" type="submit">Save entry <span class="arrow-circle">✓</span></button>
+              <button class="button secondary small" type="button" id="loadToday">Load today</button>
+              <button class="button secondary small" type="button" id="exportData">Export JSON</button>
+              <button class="button secondary small" type="button" id="clearData">Clear local data</button>
+            </div>
+            <p class="micro" id="saveConfirm" aria-live="polite"></p>
+          </form>
+        </div>
+        <aside class="panel">
+          <div class="panel-title"><h3>Progress</h3><span class="micro" id="monthLabel">Month</span></div>
+          <div class="summary-stack" id="summaryCards"></div>
+          <div style="height:16px"></div>
+          <div class="calendar" id="calendar"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" data-page="plan" aria-labelledby="plan-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Weekly architecture</p><h2 id="plan-title">Plan</h2><p>A beach volleyball week that balances skill, jump work, endurance and recovery. Treat it as a living plan, not sacred scripture carved into a coconut.</p></div>
+        <span class="route-chip">Weekly plan + taper</span>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><h3>Weekly Plan</h3><span class="micro">Built from the coaching recommendation: strength twice, skill quality, recovery protected.</span></div>
+        <div class="plan-grid">
+          <article class="day-card"><strong>Mon</strong><em>Strength A + controlled games</em><ul><li>Lunch: lower body, ankle and core strength.</li><li>Night: casual games at controlled intensity.</li><li>Keep it moderate-hard, not a leg funeral.</li></ul></article>
+          <article class="day-card"><strong>Tue</strong><em>Optional light skills</em><ul><li>Light pepper or ball control only if fresh.</li><li>No extra conditioning.</li><li>Rest if sleep, soreness or joints say no.</li></ul></article>
+          <article class="day-card"><strong>Wed</strong><em>Coached / skill session</em><ul><li>Passing, reading and defensive movement.</li><li>Serve receive reps and partner communication.</li><li>Stop before fatigue turns quality into confetti.</li></ul></article>
+          <article class="day-card"><strong>Thu</strong><em>Strength B power + prehab</em><ul><li>Lunch: approach jumps, lateral bounds, upper body.</li><li>Shoulder, elbow and ankle prehab.</li><li>Night: rest or very light pepper only.</li></ul></article>
+          <article class="day-card"><strong>Fri</strong><em>Recovery lock</em><ul><li>Rest, mobility and hydration.</li><li>Protect sleep and fuel.</li><li>No heroic last-minute leg destruction.</li></ul></article>
+          <article class="day-card"><strong>Sat</strong><em>Main volleyball load</em><ul><li>Main drills and 2v2 work.</li><li>Casual 3v3 / 4v4 only if legs are still good.</li><li>Track hydration and carbs during long sessions.</li></ul></article>
+          <article class="day-card"><strong>Sun</strong><em>Technical + recovery-biased</em><ul><li>Lower-intensity skills or self-organized drills.</li><li>Add defensive speed block if fresh.</li><li>Stop before the legs become noodles.</li></ul></article>
+        </div>
+      </div>
+      <div class="taper" style="margin-top:18px">
+        <div class="panel"><h3>Load Rule</h3><p>Cap hard days at three: Monday strength + games, Thursday strength/power and Saturday main volleyball.</p></div>
+        <div class="panel"><h3>Readiness</h3><p>Before training, rate sleep, leg soreness, motivation, joint pain and energy. If three or more are bad, reduce intensity 30–50%.</p></div>
+        <div class="panel"><h3>Hydration</h3><p>Long beach sessions start at 500–750ml fluid per hour, with electrolytes and carbs for sessions over 90 minutes.</p></div>
+        <div class="panel"><h3>Progress</h3><p>Test approach jump every two weeks. Track soreness, ankle confidence, late-game defense, hydration and elbow soreness.</p></div>
+      </div>
+      <div class="section-head">
+        <h2>Tournament Taper</h2>
+        <p>The goal is springy and sharp, not “accidentally peaked in training and now my calves have unionized.”</p>
+      </div>
+      <div class="taper">
+        <div class="panel"><h3>Wed / Thu</h3><p>Keep it light-moderate: 20–30 min pepper, serve receive, defensive reads, partner communication and short 2v2 games. Avoid heavy legs, max jumps and endless diving reps.</p></div>
+        <div class="panel"><h3>Fri Primer</h3><p>20–25 min only: easy mobility, bodyweight squats, reverse lunges, calf raises, 3×3 approach jumps at 70–80% and 5–8 easy serves.</p></div>
+        <div class="panel"><h3>Game Day Warm-Up</h3><p>Jog or shuffle, mobilise hips/ankles/shoulders, then 2 rounds of pogos, lateral shuffles, building approach jumps, serve receive and controlled defensive moves.</p></div>
+        <div class="panel"><h3>Between Games</h3><p>Sip fluids, eat small carbs, stay out of sun where possible and keep shoulders warm. Tiny choices, annoyingly large payoff.</p></div>
+      </div>
+      <div class="panel" style="margin-top:18px">
+        <div class="panel-title"><h3>Plan Checklist</h3><span class="micro">Saved locally</span></div>
+        <label class="checkline"><input type="checkbox" data-plan-check="hydration">Hydration target set for high-heat sessions.</label>
+        <label class="checkline"><input type="checkbox" data-plan-check="skill">One main skill focus selected for the week.</label>
+        <label class="checkline"><input type="checkbox" data-plan-check="recovery">At least one recovery block protected.</label>
+        <label class="checkline"><input type="checkbox" data-plan-check="taper">Taper adjusted if tournament is within 7 days.</label>
+      </div>
+    </section>
+
+    <section class="page" data-page="drills" aria-labelledby="drills-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Skill library</p><h2 id="drills-title">Drills</h2><p>Filter by skill set and pick drills that feed your four goals: defense, jumping, endurance and safe diving. A few drill concepts are seeded from the uploaded Better at Beach drill book, paraphrased into short training cards.</p></div>
+        <span class="route-chip">Skill-set filter</span>
+      </div>
+      <div class="filters" aria-label="Drill filters">
+        <button class="filter-btn active" type="button" data-filter="all">All</button>
+        <button class="filter-btn" type="button" data-filter="passing">Passing</button>
+        <button class="filter-btn" type="button" data-filter="defense">Defense</button>
+        <button class="filter-btn" type="button" data-filter="attack">Attack</button>
+        <button class="filter-btn" type="button" data-filter="serving">Serving</button>
+        <button class="filter-btn" type="button" data-filter="control">Ball control</button>
+        <button class="filter-btn" type="button" data-filter="game">Game situations</button>
+      </div>
+      <div class="drill-grid" id="drillGrid">
+        <article class="drill-card" data-skill="passing" data-skill-label="Passing"><h3>Partner Passing</h3><p>Stand close enough to repeat clean contacts. Toss, pass, reset and add shoulder-angle challenges as quality improves.</p><div class="drill-meta"><span class="tag">2 players</span><span class="tag">10 min</span><span class="tag">Serve receive</span></div></article>
+        <article class="drill-card" data-skill="passing" data-skill-label="Passing"><h3>Short–Deep Reads</h3><p>Alternate short and deep balls so the passer learns to move early, arrive balanced and control the platform under fatigue.</p><div class="drill-meta"><span class="tag">2 players</span><span class="tag">Footwork</span><span class="tag">Endurance</span></div></article>
+        <article class="drill-card" data-skill="defense" data-skill-label="Defense"><h3>Cross-Court Pocket</h3><p>Defender starts neutral, reads attacker shoulder and covers the cross-court lane. Score one point for a controlled dig to target.</p><div class="drill-meta"><span class="tag">2–4 players</span><span class="tag">Solid defense</span><span class="tag">Reads</span></div></article>
+        <article class="drill-card" data-skill="defense" data-skill-label="Defense"><h3>Dive + Recover</h3><p>Feed reachable balls just outside the body line. Player slides safely, pops up, then resets for the next ball.</p><div class="drill-meta"><span class="tag">Low volume</span><span class="tag">Diving</span><span class="tag">Injury prevention</span></div></article>
+        <article class="drill-card" data-skill="control" data-skill-label="Control"><h3>Hot Potato</h3><p>Use a second ball or object as a timing challenge. Communicate before contact and keep the main ball alive.</p><div class="drill-meta"><span class="tag">Fun chaos</span><span class="tag">Communication</span><span class="tag">Team spacing</span></div></article>
+        <article class="drill-card" data-skill="control" data-skill-label="Control"><h3>6-Touch Pepper</h3><p>Use a fixed sequence of emergency touches before sending the ball back. The goal is calm improvisation, not pretty panic.</p><div class="drill-meta"><span class="tag">Partner</span><span class="tag">Emergency</span><span class="tag">Control</span></div></article>
+        <article class="drill-card" data-skill="serving" data-skill-label="Serving"><h3>Around the World</h3><p>Divide the court into zones and serve each target in order. Misses can either pause progress or send you backward for pressure.</p><div class="drill-meta"><span class="tag">Accuracy</span><span class="tag">Solo-friendly</span><span class="tag">Pressure</span></div></article>
+        <article class="drill-card" data-skill="serving" data-skill-label="Serving"><h3>Deep Rainbow</h3><p>Train high deep serves that land near the back area and push passers off their comfort spot.</p><div class="drill-meta"><span class="tag">Serve depth</span><span class="tag">Targets</span><span class="tag">Tactical</span></div></article>
+        <article class="drill-card" data-skill="attack" data-skill-label="Attack"><h3>Zig-Zag Approach</h3><p>Move through staggered toss points and focus on getting feet to the ball before jumping vertically.</p><div class="drill-meta"><span class="tag">Higher jumps</span><span class="tag">Approach</span><span class="tag">Rhythm</span></div></article>
+        <article class="drill-card" data-skill="attack" data-skill-label="Attack"><h3>Decision Vision</h3><p>Defender shows short or deep late. Attacker must see the cue and choose the right shot instead of donating free balls.</p><div class="drill-meta"><span class="tag">Vision</span><span class="tag">Shot choice</span><span class="tag">Attack</span></div></article>
+        <article class="drill-card" data-skill="game" data-skill-label="Game"><h3>Plus / Minus</h3><p>Offense receives rapid feeds. Winning adds points, losing subtracts points. Great for sideout focus and conditioning.</p><div class="drill-meta"><span class="tag">Conditioning</span><span class="tag">Sideout</span><span class="tag">Pressure</span></div></article>
+        <article class="drill-card" data-skill="game" data-skill-label="Game"><h3>1–2–3 Rally</h3><p>Rallies begin with restricted touches, then build into full three-touch volleyball. Rewards early control and smart choices.</p><div class="drill-meta"><span class="tag">Game IQ</span><span class="tag">Team play</span><span class="tag">Scoring</span></div></article>
+      </div>
+    </section>
+
+    <section class="page" data-page="warmups" aria-labelledby="warmups-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Prep + mobility</p><h2 id="warmups-title">Warmups</h2><p>Warmups and maintenance pulled from the coaching recommendation: land quietly, protect ankles and shoulders, and avoid turning every session into a survival documentary.</p></div>
+        <span class="route-chip">Warmups & stretches</span>
+      </div>
+      <div class="warm-grid">
+        <article class="warm-card"><h3>Training Warm-Up</h3><p>Use before normal beach sessions.</p><ul><li>5 min easy jog, shuffle and sand movement.</li><li>Dynamic hips, ankles and shoulders.</li><li>10 pogo hops + 6 lateral shuffles each way.</li><li>5 approach jumps, gradually building.</li><li>5 serve-receive passes and 5 controlled defensive moves into platform.</li></ul></article>
+        <article class="warm-card"><h3>Friday Primer</h3><p>Use the day before a tournament or hard match day.</p><ul><li>5 min easy mobility.</li><li>2×10 bodyweight squats.</li><li>2×8 reverse lunges each side.</li><li>2×10 calf raises.</li><li>3×3 approach jumps at 70–80% + 5–8 easy serves.</li></ul></article>
+        <article class="warm-card"><h3>Strength A Warm-Up</h3><p>Before lower-body strength.</p><ul><li>Ankle circles: 10 each direction.</li><li>World’s greatest stretch: 5 each side.</li><li>Glute bridges: 15.</li><li>Bodyweight squats: 12.</li><li>Lateral lunges: 8 each side + pogo hops 2×20 sec.</li></ul></article>
+        <article class="warm-card"><h3>Strength B Warm-Up</h3><p>Before power, upper body and prehab.</p><ul><li>Band pull-aparts: 15.</li><li>Scapular push-ups: 10.</li><li>Hip airplanes or single-leg balance: 5 each side.</li><li>Lateral shuffles: 2×10m.</li><li>Low pogo hops: 2×15 sec.</li></ul></article>
+        <article class="warm-card"><h3>Ankle Routine</h3><p>3× per week, 8 minutes, after training or at home.</p><ul><li>Single-leg balance: 2×45 sec each side.</li><li>Single-leg balance with head turns: 2×30 sec each side.</li><li>Calf raises: 3×15.</li><li>Tibialis raises: 3×20.</li><li>Lateral line hops: 2×20 sec each side.</li></ul></article>
+        <article class="warm-card"><h3>Shoulder / Elbow Prehab</h3><p>3× per week. Boring, useful, annoyingly effective.</p><ul><li>Band external rotation: 3×15.</li><li>Band pull-aparts: 3×15.</li><li>Scapular push-ups: 2×10.</li><li>Wrist extensor eccentrics: 3×12.</li><li>Forearm pronation / supination: 2×10 each side.</li></ul></article>
+        <article class="warm-card"><h3>Controlled Sprawl Progression</h3><p>For safer diving mechanics.</p><ul><li>Low lunge reach.</li><li>Knee slide / hip drop.</li><li>Controlled sprawl.</li><li>Full dive only when clean.</li><li>Reach through ball, land on forearms/side body, then roll or slide.</li></ul></article>
+        <article class="warm-card"><h3>Post-Session Downshift</h3><p>Cool down before leaving the beach.</p><ul><li>Calf stretch: 45 sec per side.</li><li>Hip flexor stretch: 45 sec per side.</li><li>Figure-four glute stretch: 45 sec per side.</li><li>Lat and shoulder stretch: 45 sec per side.</li><li>Slow nasal breathing: 5 breaths.</li></ul></article>
+      </div>
+    </section>
+
+    <section class="page" data-page="workouts" aria-labelledby="workouts-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Strength + conditioning</p><h2 id="workouts-title">Workouts</h2><p>The recommendation is simple: do not add random volume. Add two structured strength/prehab sessions, then one quality-based defender block when fresh. Every exercise links to a reference card.</p></div>
+        <span class="route-chip">Direct exercise links</span>
+      </div>
+      <div class="workout-layout">
+        <div class="workout-grid">
+          <article class="workout-card"><h3>Strength A: Jump Foundation</h3><p>Monday lunch · 60–75 min · lower body, ankle durability and core.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-squat-pattern">Squat pattern</a><span>4×5–6</span></div><div class="exercise-link"><a href="#ref-rdl">Romanian deadlift</a><span>3×8</span></div><div class="exercise-link"><a href="#ref-bulgarian-split-squat">Bulgarian split squat</a><span>3×8/side</span></div><div class="exercise-link"><a href="#ref-hip-thrust">Hip thrust / glute bridge</a><span>3×10</span></div><div class="exercise-link"><a href="#ref-standing-calf-raise">Standing calf raise</a><span>3×12–15</span></div><div class="exercise-link"><a href="#ref-tibialis-raise">Tibialis raise</a><span>3×15–20</span></div><div class="exercise-link"><a href="#ref-dead-bug">Dead bug</a><span>3×8/side</span></div><div class="exercise-link"><a href="#ref-side-plank">Side plank</a><span>3×30–45s</span></div></div></article>
+          <article class="workout-card"><h3>Strength B: Power + Prehab</h3><p>Thursday lunch · 50–60 min · crisp jumps, upper body and arm care.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-approach-jump">Approach jumps</a><span>4×3</span></div><div class="exercise-link"><a href="#ref-lateral-bounds">Lateral bounds</a><span>3×5/side</span></div><div class="exercise-link"><a href="#ref-push-up">Push-ups</a><span>3×8–12</span></div><div class="exercise-link"><a href="#ref-pull-row">Pull-ups / band rows</a><span>3×6–10</span></div><div class="exercise-link"><a href="#ref-single-leg-rdl">Single-leg RDL</a><span>3×8/side</span></div><div class="exercise-link"><a href="#ref-band-external-rotation">Band external rotations</a><span>3×12–15</span></div><div class="exercise-link"><a href="#ref-band-face-pull">Band face pulls</a><span>3×15</span></div><div class="exercise-link"><a href="#ref-wrist-extensor">Wrist extensor eccentrics</a><span>3×12</span></div><div class="exercise-link"><a href="#ref-pronation-supination">Pronation / supination</a><span>2×10</span></div></div></article>
+          <article class="workout-card"><h3>Home Strength A</h3><p>No gym option. Jump gains may be slower, but this still builds useful sand resilience.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-tempo-goblet-squat">Tempo goblet squat + backpack</a><span>4×10</span></div><div class="exercise-link"><a href="#ref-bulgarian-split-squat">Bulgarian split squat</a><span>4×10/side</span></div><div class="exercise-link"><a href="#ref-single-leg-hip-thrust">Single-leg hip thrust</a><span>3×10/side</span></div><div class="exercise-link"><a href="#ref-single-leg-rdl">Single-leg RDL with backpack</a><span>3×10/side</span></div><div class="exercise-link"><a href="#ref-standing-calf-raise">Calf raises</a><span>4×15–20</span></div><div class="exercise-link"><a href="#ref-tibialis-raise">Tibialis raises</a><span>3×20</span></div><div class="exercise-link"><a href="#ref-side-plank">Side plank</a><span>3×30–45s</span></div></div></article>
+          <article class="workout-card"><h3>Home Power B</h3><p>Low equipment power and upper-body support. Keep contacts quick, not sloppy.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-approach-jump">Approach jumps</a><span>5×3</span></div><div class="exercise-link"><a href="#ref-pogo-hops">Pogo hops</a><span>4×20s</span></div><div class="exercise-link"><a href="#ref-lateral-bounds">Lateral bounds</a><span>3×5/side</span></div><div class="exercise-link"><a href="#ref-squat-jump">Squat jumps</a><span>3×5</span></div><div class="exercise-link"><a href="#ref-push-up">Push-ups</a><span>3×10</span></div><div class="exercise-link"><a href="#ref-scapular-pull">Pull-up bar hangs / scap pulls</a><span>3×20–30s</span></div><div class="exercise-link"><a href="#ref-pull-row">Band rows</a><span>3×15</span></div><div class="exercise-link"><a href="#ref-band-external-rotation">Band external rotations</a><span>3×15</span></div></div></article>
+          <article class="workout-card"><h3>Defensive Speed Block</h3><p>Sunday or coached session · 20–25 min · quality-based, not exhaustion-based.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-split-step-reaction">Split-step reaction drill</a><span>4×45s</span></div><div class="exercise-link"><a href="#ref-short-ball-pickup">Short-ball pickup</a><span>4×6</span></div><div class="exercise-link"><a href="#ref-deep-chase">Deep-line / deep-angle chase</a><span>4×5</span></div><div class="exercise-link"><a href="#ref-controlled-sprawl">Controlled sprawl progression</a><span>3×5/side</span></div></div></article>
+          <article class="workout-card"><h3>Rally Conditioning Finisher</h3><p>Once weekly if fresh · 12–15 min · repeated rally endurance.</p><div class="exercise-list"><div class="exercise-link"><a href="#ref-defender-repeat">Defender repeat efforts</a><span>10 rounds</span></div><div class="exercise-link"><a href="#ref-ball-conditioning">Ball-based conditioning</a><span>6–8 rounds</span></div><div class="exercise-link"><a href="#ref-recovery-breathing">Recovery breathing</a><span>3 min</span></div></div></article>
+        </div>
+        <aside class="reference-library" aria-label="Exercise reference library">
+          <div class="notice">Exercise reference library. Links from workouts open the matching card directly.</div>
+          <article class="ref-card" id="ref-squat-pattern"><h3>Squat Pattern</h3><p>Use goblet squat or barbell squat. Stay tall, brace, lower with control and drive up cleanly.</p><ul><li>Hard but clean. No ugly grinder reps.</li><li>Train power, not survival.</li></ul></article>
+          <article class="ref-card" id="ref-rdl"><h3>Romanian Deadlift</h3><p>Hinge at hips, soft knees, long spine. Lower slowly until hamstrings load, then stand tall.</p></article>
+          <article class="ref-card" id="ref-bulgarian-split-squat"><h3>Bulgarian Split Squat</h3><p>Back foot elevated, front foot stable. Build single-leg strength for takeoff, deceleration and recovery steps.</p></article>
+          <article class="ref-card" id="ref-hip-thrust"><h3>Hip Thrust / Glute Bridge</h3><p>Drive through heels, squeeze glutes at top, keep ribs down. Do not turn it into a lower-back performance art piece.</p></article>
+          <article class="ref-card" id="ref-standing-calf-raise"><h3>Standing Calf Raise</h3><p>Rise tall, pause at the top and lower slowly. Use support for balance when needed.</p></article>
+          <article class="ref-card" id="ref-tibialis-raise"><h3>Tibialis Raise</h3><p>Lean against a wall and lift toes toward shins. Useful for ankle durability and shin control.</p></article>
+          <article class="ref-card" id="ref-dead-bug"><h3>Dead Bug</h3><p>Low back stays gently connected to the floor while opposite arm and leg extend.</p></article>
+          <article class="ref-card" id="ref-side-plank"><h3>Side Plank</h3><p>Elbow under shoulder, ribs stacked and hips lifted. Boringly controlled is the whole point.</p></article>
+          <article class="ref-card" id="ref-approach-jump"><h3>Approach Jump</h3><p>Fast last two steps, big arm swing, tall chest, jump up not forward, land quietly.</p><ul><li>Rest 60–90 sec between crisp reps.</li><li>Test max jump every two weeks, not every session.</li></ul></article>
+          <article class="ref-card" id="ref-lateral-bounds"><h3>Lateral Bounds</h3><p>Push sideways, land on one leg and stick for one second. Trains defender movement and knee/ankle control.</p></article>
+          <article class="ref-card" id="ref-push-up"><h3>Push-Up</h3><p>Hands under shoulders, ribs controlled, full-body tension. Elevate hands if needed.</p></article>
+          <article class="ref-card" id="ref-pull-row"><h3>Pull-Ups / Band Rows</h3><p>Pull elbows toward ribs, keep shoulders away from ears. Use assistance or bands as needed.</p></article>
+          <article class="ref-card" id="ref-single-leg-rdl"><h3>Single-Leg RDL</h3><p>Single-leg hinge with hips square. Reach long, then drive through standing foot.</p></article>
+          <article class="ref-card" id="ref-band-external-rotation"><h3>Band External Rotation</h3><p>Elbow near side, rotate forearm out without twisting torso. Keep it pain-free.</p></article>
+          <article class="ref-card" id="ref-band-face-pull"><h3>Band Face Pull</h3><p>Pull band toward face with elbows high, shoulder blades moving smoothly.</p></article>
+          <article class="ref-card" id="ref-wrist-extensor"><h3>Wrist Extensor Eccentrics</h3><p>Use a light dumbbell. Help the weight up, then lower slowly with wrist extensors.</p></article>
+          <article class="ref-card" id="ref-pronation-supination"><h3>Pronation / Supination</h3><p>Hold a light dumbbell or hammer-like object and rotate palm up/down under control.</p></article>
+          <article class="ref-card" id="ref-tempo-goblet-squat"><h3>Tempo Goblet Squat</h3><p>Hold dumbbell or backpack. Use 3 seconds down, 1 second pause, then stand tall.</p></article>
+          <article class="ref-card" id="ref-single-leg-hip-thrust"><h3>Single-Leg Hip Thrust</h3><p>One foot planted, one leg lifted. Drive hips up without arching your lower back.</p></article>
+          <article class="ref-card" id="ref-pogo-hops"><h3>Pogo Hops</h3><p>Small quick ankle hops with tall posture. Keep knees soft and contacts quiet.</p></article>
+          <article class="ref-card" id="ref-squat-jump"><h3>Squat Jump</h3><p>Dip under control, jump vertically and land softly. Stop when jump height drops.</p></article>
+          <article class="ref-card" id="ref-scapular-pull"><h3>Bar Hang / Scapular Pull</h3><p>Hang from bar if available. Pull shoulder blades down slightly, then relax with control.</p></article>
+          <article class="ref-card" id="ref-split-step-reaction"><h3>Split-Step Reaction Drill</h3><p>Partner points left/right/short/deep. Stay low, first step explosive, platform early.</p></article>
+          <article class="ref-card" id="ref-short-ball-pickup"><h3>Short-Ball Pickup</h3><p>Partner tosses short balls randomly. Sprint first, lower hips, set platform before contact.</p></article>
+          <article class="ref-card" id="ref-deep-chase"><h3>Deep-Line / Deep-Angle Chase</h3><p>Start middle-back. Partner calls line or angle. Open hips, turn and run, then platform.</p></article>
+          <article class="ref-card" id="ref-controlled-sprawl"><h3>Controlled Sprawl</h3><p>Progress from low lunge reach to knee slide, hip drop, controlled sprawl and then full dive only when clean.</p><ul><li>Keep chin up and reach through the ball.</li><li>Land on forearms/side body, not elbow point.</li></ul></article>
+          <article class="ref-card" id="ref-defender-repeat"><h3>Defender Repeat Efforts</h3><p>20 sec hard movement: shuffle, drop, recover and short sprint. Rest 40 sec. Repeat 10 rounds.</p></article>
+          <article class="ref-card" id="ref-ball-conditioning"><h3>Ball-Based Conditioning</h3><p>Partner feeds short, deep, angle and free-ball transition. Do 6 balls per rally simulation for 6–8 rounds.</p></article>
+          <article class="ref-card" id="ref-recovery-breathing"><h3>Recovery Breathing</h3><p>Slow nasal inhale, longer exhale. Use between rounds or after a hot session.</p></article>
+        </aside>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Beach Volleyball Training Hub · single-file HTML · GitHub Pages ready</span>
+      <span>Data saves only in this browser via localStorage.</span>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Saved</div>
+
+  <script>
+    const pages = ["home","track","plan","drills","warmups","workouts"];
+    const storageKey = "bv_training_hub_v2";
+    const hydrationWords = {1:"Low",2:"Light",3:"Okay",4:"Good",5:"Excellent"};
+    const todayISO = () => new Date().toISOString().slice(0,10);
+
+    function route(){
+      let raw = (location.hash || "#home").replace("#","");
+      let page = pages.includes(raw) ? raw : (raw.startsWith("ref-") ? "workouts" : "home");
+      document.querySelectorAll(".page").forEach(section => section.classList.toggle("active", section.dataset.page === page));
+      document.querySelectorAll("[data-nav]").forEach(link => {
+        if(link.dataset.nav === page) link.setAttribute("aria-current","page");
+        else link.removeAttribute("aria-current");
+      });
+      if(page === "track") renderTracking();
+      if(raw.startsWith("ref-")) setTimeout(() => document.getElementById(raw)?.scrollIntoView({behavior:"smooth", block:"start"}), 70);
+      else window.scrollTo({top:0, behavior:"smooth"});
+    }
+
+    function storageAvailable(){
+      try{
+        const test = "__bv_test__";
+        localStorage.setItem(test,"1");
+        localStorage.removeItem(test);
+        return true;
+      } catch(e){ return false; }
+    }
+    function defaultState(){ return {logs:{}, planChecks:{}}; }
+    function readState(){
+      if(!storageAvailable()) return defaultState();
+      try{
+        const raw = localStorage.getItem(storageKey);
+        if(!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        return {logs: parsed.logs && typeof parsed.logs === "object" ? parsed.logs : {}, planChecks: parsed.planChecks && typeof parsed.planChecks === "object" ? parsed.planChecks : {}};
+      } catch(e){
+        console.warn("Local data was unreadable. Starting safely with empty state.", e);
+        return defaultState();
+      }
+    }
+    function writeState(state){
+      if(!storageAvailable()) { showToast("Storage unavailable in this browser"); return false; }
+      try{
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        return true;
+      } catch(e){
+        console.error("Save failed", e);
+        showToast("Save failed — storage may be full");
+        return false;
+      }
+    }
+    function showToast(message){
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2100);
+    }
+
+    function setRangeLabels(){
+      const energy = document.getElementById("energy");
+      const soreness = document.getElementById("soreness");
+      const hydration = document.getElementById("hydration");
+      const rating = document.getElementById("rating");
+      if(!energy) return;
+      document.getElementById("energyLabel").textContent = energy.value;
+      document.getElementById("sorenessLabel").textContent = soreness.value;
+      document.getElementById("hydrationLabel").textContent = hydrationWords[hydration.value] || "Good";
+      document.getElementById("ratingLabel").textContent = rating.value;
+    }
+
+    function loadEntry(date){
+      const state = readState();
+      const log = state.logs[date];
+      const form = document.getElementById("dailyForm");
+      if(!form) return;
+      form.reset();
+      document.getElementById("logDate").value = date;
+      document.getElementById("energy").value = log?.energy || 3;
+      document.getElementById("soreness").value = log?.soreness || 2;
+      document.getElementById("hydration").value = log?.hydration || 4;
+      document.getElementById("rating").value = log?.rating || 3;
+      document.getElementById("sleepHours").value = log?.sleepHours || "";
+      document.getElementById("focusSkill").value = log?.focusSkill || "Defense";
+      document.getElementById("duration").value = log?.duration || "";
+      document.getElementById("notes").value = log?.notes || "";
+      document.querySelectorAll("input[name='activities']").forEach(cb => cb.checked = (log?.activities || []).includes(cb.value));
+      setRangeLabels();
+    }
+
+    function saveEntry(event){
+      event.preventDefault();
+      const state = readState();
+      const date = document.getElementById("logDate").value || todayISO();
+      const activities = [...document.querySelectorAll("input[name='activities']:checked")].map(cb => cb.value);
+      const log = {
+        date,
+        sleepHours: document.getElementById("sleepHours").value,
+        energy: Number(document.getElementById("energy").value),
+        soreness: Number(document.getElementById("soreness").value),
+        hydration: Number(document.getElementById("hydration").value),
+        focusSkill: document.getElementById("focusSkill").value,
+        activities,
+        duration: Number(document.getElementById("duration").value || 0),
+        rating: Number(document.getElementById("rating").value),
+        notes: document.getElementById("notes").value.trim(),
+        savedAt: new Date().toISOString()
+      };
+      state.logs[date] = log;
+      if(writeState(state)){
+        document.getElementById("saveConfirm").textContent = `Saved ${date}. ${activities.length ? activities.length + " activities logged." : "No activities selected."}`;
+        showToast("Saved to this browser");
+        renderTracking();
+      }
+    }
+
+    function renderTracking(){
+      const storageStatus = document.getElementById("storageStatus");
+      if(storageStatus) storageStatus.textContent = storageAvailable() ? "Storage ready" : "Storage unavailable";
+      const formDate = document.getElementById("logDate");
+      if(formDate && !formDate.value) loadEntry(todayISO());
+      setRangeLabels();
+      renderSummary();
+      renderCalendar();
+    }
+
+    function renderSummary(){
+      const target = document.getElementById("summaryCards");
+      if(!target) return;
+      const logs = Object.values(readState().logs);
+      const sessions = logs.filter(l => (l.activities || []).length && !(l.activities || []).includes("Rest")).length;
+      const totalMin = logs.reduce((sum,l) => sum + Number(l.duration || 0), 0);
+      const avgHydration = logs.length ? (logs.reduce((sum,l)=>sum+Number(l.hydration || 0),0)/logs.length).toFixed(1) : "—";
+      const defenseDays = logs.filter(l => l.focusSkill === "Defense" || (l.notes || "").toLowerCase().includes("defense")).length;
+      target.innerHTML = `
+        <div class="summary-card"><span class="micro">Logged sessions</span><b>${sessions}</b></div>
+        <div class="summary-card"><span class="micro">Training minutes</span><b>${totalMin}</b></div>
+        <div class="summary-card"><span class="micro">Avg hydration</span><b>${avgHydration}</b></div>
+        <div class="summary-card"><span class="micro">Defense focus days</span><b>${defenseDays}</b></div>
+      `;
+    }
+
+    function renderCalendar(){
+      const cal = document.getElementById("calendar");
+      if(!cal) return;
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const first = new Date(year, month, 1);
+      const days = new Date(year, month + 1, 0).getDate();
+      const startOffset = first.getDay();
+      const state = readState();
+      document.getElementById("monthLabel").textContent = first.toLocaleString(undefined,{month:"long", year:"numeric"});
+      const heads = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="cal-head">${d}</div>`).join("");
+      let cells = "";
+      for(let i=0;i<startOffset;i++) cells += `<div class="cal-day blank"></div>`;
+      for(let d=1; d<=days; d++){
+        const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const log = state.logs[iso];
+        const classes = ["cal-day", log ? "logged" : "", iso === todayISO() ? "today" : ""].join(" ");
+        const count = log?.activities?.length || 0;
+        cells += `<button type="button" class="${classes}" data-load-date="${iso}" aria-label="${iso}${log ? ', logged' : ''}"><span class="cal-num">${d}</span>${log ? `<span class="cal-badge">${count}</span>` : `<span></span>`}</button>`;
+      }
+      cal.innerHTML = heads + cells;
+      cal.querySelectorAll("[data-load-date]").forEach(btn => btn.addEventListener("click", () => loadEntry(btn.dataset.loadDate)));
+    }
+
+    function initPlanChecks(){
+      const state = readState();
+      document.querySelectorAll("[data-plan-check]").forEach(box => {
+        box.checked = Boolean(state.planChecks[box.dataset.planCheck]);
+        box.addEventListener("change", () => {
+          const next = readState();
+          next.planChecks[box.dataset.planCheck] = box.checked;
+          if(writeState(next)) showToast("Plan checklist saved");
+        });
+      });
+    }
+
+    function initDrillFilters(){
+      const buttons = document.querySelectorAll("[data-filter]");
+      const cards = document.querySelectorAll(".drill-card");
+      buttons.forEach(button => button.addEventListener("click", () => {
+        buttons.forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        const filter = button.dataset.filter;
+        cards.forEach(card => card.style.display = filter === "all" || card.dataset.skill === filter ? "flex" : "none");
+      }));
+    }
+
+    function initTracking(){
+      const form = document.getElementById("dailyForm");
+      if(!form) return;
+      document.getElementById("logDate").value = todayISO();
+      ["energy","soreness","hydration","rating"].forEach(id => document.getElementById(id).addEventListener("input", setRangeLabels));
+      form.addEventListener("submit", saveEntry);
+      document.getElementById("loadToday").addEventListener("click", () => loadEntry(todayISO()));
+      document.getElementById("exportData").addEventListener("click", () => {
+        const data = JSON.stringify(readState(), null, 2);
+        const blob = new Blob([data], {type:"application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `beach-volleyball-training-data-${todayISO()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast("Export prepared");
+      });
+      document.getElementById("clearData").addEventListener("click", () => {
+        const ok = confirm("Clear all local training data saved by this page?");
+        if(!ok) return;
+        try{ localStorage.removeItem(storageKey); showToast("Local data cleared"); loadEntry(todayISO()); renderTracking(); }
+        catch(e){ showToast("Could not clear data"); }
+      });
+      loadEntry(todayISO());
+    }
+
+    window.addEventListener("hashchange", route);
+    document.addEventListener("DOMContentLoaded", () => {
+      initTracking();
+      initPlanChecks();
+      initDrillFilters();
+      route();
+    });
+  </script>
+</body>
+</html>
