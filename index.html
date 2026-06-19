@@ -227,6 +227,43 @@
     @media (max-width: 680px){
       .shell{width:min(100% - 22px,1180px)}main{padding-top:14px}h1{font-size:60px}.hero{padding-top:22px}.hero-art{min-height:360px;border-radius:22px}.hero-copy{font-size:16px}.program-row{grid-template-columns:1fr auto;gap:10px;padding:12px 0}.program-meta{grid-column:1/-1}.program-title{font-size:42px}.info-grid,.field-grid,.activity-grid,.plan-grid,.drill-grid,.warm-grid,.taper{grid-template-columns:1fr}.page-hero{padding-top:28px}.cal-day{min-height:58px}.brand{font-size:21px}.mini-nav{gap:14px}.goal-marquee span{font-size:27px}.stamp{left:18px;right:18px;bottom:18px}.workout-layout{display:block}.reference-library{margin-top:14px}
     }
+    /* ===== Form Coach (computer-vision) ===== */
+    .coach-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:22px;align-items:start}
+    @media(max-width:880px){.coach-grid{grid-template-columns:1fr}}
+    .stage{position:relative;border-radius:var(--radius);overflow:hidden;background:#0d0d0d;aspect-ratio:4/3;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+    .stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .stage video{transform:scaleX(-1)}
+    .stage canvas{transform:scaleX(-1);pointer-events:none}
+    .stage-empty{color:#f4f1e8;text-align:center;padding:24px;max-width:34ch;font-size:.95rem;opacity:.85;z-index:2}
+    .stage-empty b{display:block;font-family:var(--display);font-size:1.4rem;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
+    .stage-badge{position:absolute;top:14px;left:14px;z-index:3;display:flex;gap:8px;align-items:center;background:rgba(13,13,13,.6);color:#f4f1e8;padding:7px 13px;border-radius:999px;font:600 .72rem/1 var(--mono);letter-spacing:.05em;text-transform:uppercase}
+    .stage-badge .dot{width:9px;height:9px;border-radius:50%;background:#888;box-shadow:0 0 0 0 rgba(202,255,53,.6)}
+    .stage-badge.live .dot{background:var(--lime);animation:pulse 1.5s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(202,255,53,.55)}70%{box-shadow:0 0 0 9px rgba(202,255,53,0)}100%{box-shadow:0 0 0 0 rgba(202,255,53,0)}}
+    .coach-controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .coach-btn{appearance:none;border:1px solid var(--line-strong);background:var(--white);color:var(--ink);font:600 .9rem var(--sans);padding:11px 18px;border-radius:999px;cursor:pointer;transition:transform .12s ease,background .2s ease}
+    .coach-btn:hover{transform:translateY(-1px)}
+    .coach-btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+    .coach-btn.accent{background:var(--lime);border-color:var(--ink)}
+    .coach-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .exercise-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .exercise-picker button{appearance:none;border:1px solid var(--line);background:var(--white);padding:8px 14px;border-radius:999px;font:600 .82rem var(--sans);cursor:pointer;color:var(--muted)}
+    .exercise-picker button.active{background:var(--blue-soft);color:var(--blue);border-color:var(--blue)}
+    .rep-readout{display:flex;gap:14px;margin-bottom:16px}
+    .rep-card{flex:1;background:var(--white);border:1px solid var(--line);border-radius:20px;padding:16px;text-align:center}
+    .rep-card b{display:block;font-family:var(--display);font-size:2.6rem;line-height:1;color:var(--ink)}
+    .rep-card.angle b{color:var(--blue)}
+    .rep-card span{font:600 .68rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .phase-track{list-style:none;padding:0;margin:0 0 16px;display:grid;gap:8px}
+    .phase-track li{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:14px;background:var(--white);border:1px solid var(--line);font-size:.9rem;color:var(--muted);transition:all .2s ease}
+    .phase-track li .pip{width:11px;height:11px;border-radius:50%;background:var(--line-strong);flex:none;transition:all .2s ease}
+    .phase-track li.active{background:var(--lime-soft);border-color:var(--ink);color:var(--ink);font-weight:600}
+    .phase-track li.active .pip{background:var(--ink);transform:scale(1.25)}
+    .form-cue{border-radius:16px;padding:13px 16px;font-size:.9rem;font-weight:500;margin-bottom:14px;border:1px solid var(--line)}
+    .form-cue.good{background:var(--lime-soft);color:#3a5a00;border-color:rgba(202,255,53,.5)}
+    .form-cue.warn{background:rgba(255,176,32,.16);color:#7a4d00;border-color:rgba(255,176,32,.4)}
+    .form-cue.info{background:var(--blue-soft);color:var(--blue);border-color:rgba(33,84,255,.3)}
+    .coach-note{font-size:.8rem;color:var(--muted);margin-top:10px;line-height:1.5}
   </style>
 </head>
 <body>
@@ -241,6 +278,7 @@
         <a href="#drills" data-nav="drills">Drills</a>
         <a href="#warmups" data-nav="warmups">Warmups</a>
         <a href="#workouts" data-nav="workouts">Workouts</a>
+        <a href="#coach" data-nav="coach">Form Coach</a>
       </nav>
       <a class="join-pill" href="#track"><span class="dot"></span> Log today</a>
     </div>
@@ -518,12 +556,46 @@
       <span>Beach Volleyball Training Hub · single-file HTML · GitHub Pages ready</span>
       <span>Data saves only in this browser via localStorage.</span>
     </footer>
+    <section class="page" data-page="coach" aria-labelledby="coach-title">
+      <div class="page-hero">
+        <div><p class="eyebrow"><span class="dot"></span> Computer vision</p><h2 id="coach-title">Form Coach</h2><p>Use your camera to track bodyweight movements in real time. The coach watches your joints, counts clean reps, walks you through each phase of the rep and flags form issues — all on-device, nothing leaves your browser.</p></div>
+        <span class="route-chip">Live movement tracking</span>
+      </div>
+
+      <div class="coach-grid">
+        <div>
+          <div class="stage" id="coachStage">
+            <video id="coachVideo" playsinline muted></video>
+            <canvas id="coachCanvas"></canvas>
+            <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
+            <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick an exercise, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
+          </div>
+          <div class="coach-controls">
+            <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
+            <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
+            <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
+            <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
+          </div>
+          <p class="coach-note">Tip: front-facing exercises (squat, glute bridge) work best straight on; push-ups and lunges read best from the side. Reps and feedback are estimates from a single camera — trust your body over the number.</p>
+        </div>
+
+        <div>
+          <div class="exercise-picker" id="exercisePicker" role="tablist" aria-label="Exercise"></div>
+          <div class="rep-readout">
+            <div class="rep-card"><b id="repCount">0</b><span>Reps</span></div>
+            <div class="rep-card angle"><b id="angleVal">—</b><span id="angleLabel">Joint angle</span></div>
+          </div>
+          <div class="form-cue info" id="formCue">Choose an exercise and start the camera to begin.</div>
+          <ul class="phase-track" id="phaseTrack"></ul>
+        </div>
+      </div>
+    </section>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite">Saved</div>
 
   <script>
-    const pages = ["home","track","plan","tournament","drills","warmups","workouts"];
+    const pages = ["home","track","plan","tournament","drills","warmups","workouts","coach"];
     const storageKey = "bv_training_hub_v1";
     const hydrationWords = {1:"Low",2:"Light",3:"Okay",4:"Good",5:"Excellent"};
     const todayISO = () => new Date().toISOString().slice(0,10);
@@ -742,6 +814,285 @@
       initPlanChecks();
       initDrillFilters();
       route();
+    });
+  </script>
+
+  <!-- ===== Form Coach: computer-vision movement tracking ===== -->
+  <script type="module">
+    // MediaPipe Tasks-Vision is loaded lazily (only when the camera starts) so the
+    // page UI works even if the CDN is unreachable. These hold the loaded classes.
+    const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+    let FilesetResolver, PoseLandmarker, DrawingUtils;
+
+    // MediaPipe BlazePose landmark indices
+    const L = {shoulder:11, elbow:13, wrist:15, hip:23, knee:25, ankle:27};
+    const R = {shoulder:12, elbow:14, wrist:16, hip:24, knee:26, ankle:28};
+
+    // angle (degrees) at point b formed by a-b-c, using 2D image coords
+    function angle(a, b, c){
+      const ab = {x:a.x-b.x, y:a.y-b.y};
+      const cb = {x:c.x-b.x, y:c.y-b.y};
+      const dot = ab.x*cb.x + ab.y*cb.y;
+      const mag = Math.hypot(ab.x, ab.y) * Math.hypot(cb.x, cb.y);
+      if(!mag) return null;
+      let deg = Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
+      return deg;
+    }
+    const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
+    // average a joint angle across whichever side(s) are clearly visible
+    function jointAngle(lm, j, indices){
+      const sides = [];
+      for(const S of [L, R]){
+        if(indices.every(k => visible(lm, S[k]))) sides.push(angle(lm[S[indices[0]]], lm[S[indices[1]]], lm[S[indices[2]]]));
+      }
+      return sides.length ? sides.reduce((s,v)=>s+v,0)/sides.length : null;
+    }
+
+    // ---- Exercise library (extensible) ----
+    const EXERCISES = {
+      squat: {
+        label:"Squat", angleName:"Knee angle", startHigh:true, down:100, up:160, depthTarget:95,
+        measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
+        phases:[
+          {name:"Stand tall", test:a=>a>=155},
+          {name:"Descend with control", test:a=>a<155&&a>=110},
+          {name:"Hit depth, then drive up", test:a=>a<110}
+        ],
+        formCheck(lm, minAngle){
+          if(minAngle != null && minAngle > 105) return {type:"warn", msg:"Go a little deeper — aim for thighs near parallel."};
+          const torso = jointAngle(lm, "hip", ["shoulder","hip","knee"]);
+          if(torso != null && torso < 55) return {type:"warn", msg:"Chest is dropping — keep your torso taller."};
+          return {type:"good", msg:"Clean squat — good depth and posture."};
+        }
+      },
+      pushup: {
+        label:"Push-up", angleName:"Elbow angle", startHigh:true, down:95, up:155, depthTarget:90, orientation:"side",
+        measure:lm => jointAngle(lm, "elbow", ["shoulder","elbow","wrist"]),
+        phases:[
+          {name:"Top — arms extended", test:a=>a>=150},
+          {name:"Lower your chest", test:a=>a<150&&a>=100},
+          {name:"Reach bottom, then press", test:a=>a<100}
+        ],
+        formCheck(lm, minAngle){
+          const line = jointAngle(lm, "hip", ["shoulder","hip","ankle"]);
+          if(line != null && line < 155) return {type:"warn", msg:"Keep a straight line — don't let hips sag or pike."};
+          if(minAngle != null && minAngle > 100) return {type:"warn", msg:"Lower further — get elbows to about 90°."};
+          return {type:"good", msg:"Solid push-up — full range and a straight body."};
+        }
+      },
+      lunge: {
+        label:"Reverse lunge", angleName:"Front-knee angle", startHigh:true, down:105, up:160, depthTarget:100, orientation:"side",
+        measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
+        phases:[
+          {name:"Stand tall", test:a=>a>=155},
+          {name:"Step back and lower", test:a=>a<155&&a>=115},
+          {name:"Front thigh parallel, drive up", test:a=>a<115}
+        ],
+        formCheck(lm, minAngle){
+          if(minAngle != null && minAngle > 110) return {type:"warn", msg:"Sink lower — front thigh toward parallel."};
+          return {type:"good", msg:"Nice lunge depth — controlled and balanced."};
+        }
+      },
+      bridge: {
+        label:"Glute bridge", angleName:"Hip angle", startHigh:false, down:135, up:162, depthTarget:165, orientation:"side",
+        measure:lm => jointAngle(lm, "hip", ["shoulder","hip","knee"]),
+        phases:[
+          {name:"Hips down to start", test:a=>a<140},
+          {name:"Drive hips up", test:a=>a>=140&&a<162},
+          {name:"Squeeze glutes at top", test:a=>a>=162}
+        ],
+        formCheck(lm, maxAngle){
+          if(maxAngle != null && maxAngle < 160) return {type:"warn", msg:"Extend further — squeeze hips to full lockout."};
+          return {type:"good", msg:"Strong bridge — full hip extension at the top."};
+        }
+      }
+    };
+
+    // ---- State ----
+    let poseLandmarker = null, draw = null, stream = null, rafId = null;
+    let current = "squat", reps = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
+    let sessionStart = null;
+
+    const els = {};
+    const ID = id => document.getElementById(id);
+    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","saveSession","exercisePicker","repCount","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
+
+    function toast(msg){
+      const t = ID("toast"); if(!t) return;
+      t.textContent = msg; t.classList.add("show");
+      setTimeout(()=>t.classList.remove("show"), 2100);
+    }
+    function badge(text, live){
+      els.stageBadgeText.textContent = text;
+      els.stageBadge.classList.toggle("live", !!live);
+    }
+    function setCue(type, msg){
+      if(msg === lastCue) return; lastCue = msg;
+      els.formCue.className = `form-cue ${type}`;
+      els.formCue.textContent = msg;
+    }
+
+    function buildPicker(){
+      els.exercisePicker.innerHTML = "";
+      Object.entries(EXERCISES).forEach(([id, ex])=>{
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = ex.label; b.dataset.ex = id;
+        b.className = id === current ? "active" : "";
+        b.addEventListener("click", ()=> selectExercise(id));
+        els.exercisePicker.appendChild(b);
+      });
+    }
+    function renderPhases(activeIdx){
+      const ex = EXERCISES[current];
+      els.phaseTrack.innerHTML = ex.phases.map((p,i)=>
+        `<li class="${i===activeIdx?"active":""}"><span class="pip"></span>${p.name}</li>`).join("");
+    }
+    function selectExercise(id){
+      current = id;
+      reps = 0; stage = "rest"; extremeAngle = null;
+      [...els.exercisePicker.children].forEach(b => b.classList.toggle("active", b.dataset.ex===id));
+      els.repCount.textContent = "0";
+      els.angleLabel.textContent = EXERCISES[id].angleName;
+      els.angleVal.textContent = "—";
+      renderPhases(-1);
+      setCue("info", running ? `Tracking ${EXERCISES[id].label.toLowerCase()}s — get into your start position.` : `Selected ${EXERCISES[id].label}. Start the camera to begin.`);
+    }
+
+    async function ensureModel(){
+      if(poseLandmarker) return;
+      badge("Loading model…", false);
+      if(!PoseLandmarker){
+        ({ FilesetResolver, PoseLandmarker, DrawingUtils } = await import(MP_URL));
+      }
+      const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
+        runningMode:"VIDEO", numPoses:1
+      });
+    }
+
+    async function startCamera(){
+      try{
+        els.startCam.disabled = true;
+        await ensureModel();
+        badge("Requesting camera…", false);
+        stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:960} }, audio:false });
+        els.coachVideo.srcObject = stream;
+        await els.coachVideo.play();
+        els.coachCanvas.width = els.coachVideo.videoWidth;
+        els.coachCanvas.height = els.coachVideo.videoHeight;
+        draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
+        els.stageEmpty.style.display = "none";
+        els.stopCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false;
+        running = true; sessionStart = Date.now();
+        badge("Live", true);
+        selectExercise(current);
+        loop();
+      }catch(err){
+        console.error("Camera/model error", err);
+        const msg = err && err.name === "NotAllowedError"
+          ? "Camera permission denied. Enable it for this site and try again."
+          : "Couldn't start the camera or load the model. Check your connection and camera, then retry.";
+        setCue("warn", msg);
+        badge("Camera off", false);
+        els.startCam.disabled = false;
+      }
+    }
+
+    function stopCamera(){
+      running = false;
+      if(rafId) cancelAnimationFrame(rafId);
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      els.coachVideo.srcObject = null;
+      const ctx = els.coachCanvas.getContext("2d");
+      ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
+      els.stageEmpty.style.display = "";
+      els.startCam.disabled = false; els.stopCam.disabled = true;
+      badge("Camera off", false);
+    }
+
+    function loop(){
+      if(!running) return;
+      const v = els.coachVideo;
+      if(v.readyState >= 2){
+        const res = poseLandmarker.detectForVideo(v, performance.now());
+        const ctx = els.coachCanvas.getContext("2d");
+        ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
+        if(res.landmarks && res.landmarks.length){
+          const lm = res.landmarks[0];
+          draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(33,84,255,.85)", lineWidth:3});
+          draw.drawLandmarks(lm, {color:"#caff35", lineWidth:1, radius:4});
+          processPose(lm);
+        } else {
+          setCue("info", "Step back so your whole body is in the frame.");
+        }
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+
+    let currentLm = {};
+    function processPose(lm){
+      currentLm = lm;
+      const ex = EXERCISES[current];
+      const a = ex.measure(lm);
+      if(a == null){ setCue("info", "Can't see the key joints clearly — adjust your position or lighting."); return; }
+      els.angleVal.textContent = Math.round(a) + "°";
+
+      // phase highlight
+      let phaseIdx = ex.phases.findIndex(p => p.test(a));
+      renderPhases(phaseIdx);
+
+      // rep state machine (handles both flexion-led and extension-led movements)
+      if(ex.startHigh){
+        if(a < ex.down){ if(stage !== "effort"){ stage = "effort"; extremeAngle = a; } extremeAngle = Math.min(extremeAngle, a); }
+        else if(a > ex.up && stage === "effort"){ stage = "rest"; countRep(ex, extremeAngle); }
+      } else {
+        if(a > ex.up){ if(stage !== "effort"){ stage = "effort"; extremeAngle = a; } extremeAngle = Math.max(extremeAngle, a); }
+        else if(a < ex.down && stage === "effort"){ stage = "rest"; countRep(ex, extremeAngle); }
+      }
+
+      // live coaching while moving (only override with the rep verdict at completion)
+      if(stage === "effort" && phaseIdx === ex.phases.length-1) setCue("good", "Good range — now reverse the movement.");
+      else if(stage === "rest" && reps === 0) setCue("info", `Get into position and do your first ${ex.label.toLowerCase()}.`);
+    }
+
+    function countRep(ex, extreme){
+      reps++;
+      els.repCount.textContent = reps;
+      const v = ex.formCheck(currentLm, extreme);
+      setCue(v.type, `Rep ${reps}: ${v.msg}`);
+      if(navigator.vibrate) navigator.vibrate(30);
+    }
+
+    function saveSession(){
+      if(!reps){ toast("No reps to save yet"); return; }
+      const key = "bv_training_hub_v1";
+      let state;
+      try{ state = JSON.parse(localStorage.getItem(key)) || {}; }catch(e){ state = {}; }
+      if(typeof state !== "object" || !state) state = {};
+      if(!Array.isArray(state.coachSessions)) state.coachSessions = [];
+      state.coachSessions.push({
+        date: new Date().toISOString().slice(0,10),
+        exercise: EXERCISES[current].label,
+        reps,
+        durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null,
+        savedAt: new Date().toISOString()
+      });
+      try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${reps} ${EXERCISES[current].label.toLowerCase()} reps`); }
+      catch(e){ toast("Save failed — storage may be full"); }
+    }
+
+    document.addEventListener("DOMContentLoaded", ()=>{
+      cache();
+      if(!els.exercisePicker) return; // page not present
+      buildPicker();
+      selectExercise(current);
+      els.startCam.addEventListener("click", startCamera);
+      els.stopCam.addEventListener("click", stopCamera);
+      els.resetReps.addEventListener("click", ()=>{ reps=0; stage="rest"; extremeAngle=null; els.repCount.textContent="0"; setCue("info","Reps reset — go again."); });
+      els.saveSession.addEventListener("click", saveSession);
+      // stop the camera if the user navigates away from the coach page
+      window.addEventListener("hashchange", ()=>{ if(running && (location.hash.replace("#","") !== "coach")) stopCamera(); });
     });
   </script>
 </body>
