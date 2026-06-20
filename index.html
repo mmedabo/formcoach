@@ -246,7 +246,9 @@
     .coach-btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
     .coach-btn.accent{background:var(--lime);border-color:var(--ink)}
     .coach-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
-    .exercise-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .exercise-picker{margin-bottom:14px}
+    .picker-group-label{font:600 .64rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 7px 2px}
+    .picker-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:13px}
     .exercise-picker button{appearance:none;border:1px solid var(--line);background:var(--white);padding:8px 14px;border-radius:999px;font:600 .82rem var(--sans);cursor:pointer;color:var(--muted)}
     .exercise-picker button.active{background:var(--blue-soft);color:var(--blue);border-color:var(--blue)}
     .rep-readout{display:flex;gap:14px;margin-bottom:16px}
@@ -558,7 +560,7 @@
     </footer>
     <section class="page" data-page="coach" aria-labelledby="coach-title">
       <div class="page-hero">
-        <div><p class="eyebrow"><span class="dot"></span> Computer vision</p><h2 id="coach-title">Form Coach</h2><p>Use your camera to track bodyweight movements in real time. The coach watches your joints, counts clean reps, walks you through each phase of the rep and flags form issues — all on-device, nothing leaves your browser.</p></div>
+        <div><p class="eyebrow"><span class="dot"></span> Computer vision</p><h2 id="coach-title">Form Coach</h2><p>Use your camera to check your <b>spike</b>, <b>set</b> and <b>receive</b> technique in real time — plus strength moves. The coach watches your joints, grades each attempt against the key checkpoints and tells you exactly what to fix. All on-device; nothing leaves your browser.</p></div>
         <span class="route-chip">Live movement tracking</span>
       </div>
 
@@ -582,7 +584,7 @@
         <div>
           <div class="exercise-picker" id="exercisePicker" role="tablist" aria-label="Exercise"></div>
           <div class="rep-readout">
-            <div class="rep-card"><b id="repCount">0</b><span>Reps</span></div>
+            <div class="rep-card"><b id="repCount">0</b><span id="repLabel">Reps</span></div>
             <div class="rep-card angle"><b id="angleVal">—</b><span id="angleLabel">Joint angle</span></div>
           </div>
           <div class="form-cue info" id="formCue">Choose an exercise and start the camera to begin.</div>
@@ -848,9 +850,109 @@
       return sides.length ? sides.reduce((s,v)=>s+v,0)/sides.length : null;
     }
 
+    // Per-frame body measurements used by the volleyball skill checks.
+    // All positions are normalized (0–1); y grows downward, so "up" = smaller y.
+    function metrics(lm){
+      const g = i => lm[i] || {x:0, y:0};
+      const vis = i => visible(lm, i);
+      const sL=g(11), sR=g(12), eL=g(13), eR=g(14), wL=g(15), wR=g(16), aL=g(27), aR=g(28), nose=g(0);
+      const elbowL = (vis(11)&&vis(13)&&vis(15)) ? angle(sL,eL,wL) : null;
+      const elbowR = (vis(12)&&vis(14)&&vis(16)) ? angle(sR,eR,wR) : null;
+      const shoulderY = (sL.y + sR.y)/2;
+      const shoulderW = Math.abs(sL.x - sR.x) || 0.001;
+      const wristGap = Math.hypot(wL.x-wR.x, wL.y-wR.y);
+      let cnt=0, sum=0; if(vis(27)){sum+=aL.y;cnt++;} if(vis(28)){sum+=aR.y;cnt++;}
+      const ankleY = cnt ? sum/cnt : null;
+      return { lm, vis, sL, sR, eL, eR, wL, wR, aL, aR, nose, noseY:nose.y,
+        elbowL, elbowR, kneeAngle:jointAngle(lm,"knee",["hip","knee","ankle"]),
+        shoulderY, shoulderW, wristGap, ankleY };
+    }
+
     // ---- Exercise library (extensible) ----
+    // type "rep"   -> joint-angle state machine + phases (strength work)
+    // type "skill" -> live multi-criteria technique check + per-attempt verdict (volleyball)
     const EXERCISES = {
+      spike: {
+        type:"skill", category:"volleyball", label:"Spike (attack)", angleName:"Status",
+        measure:lm => null,
+        hint:"Approach, jump, and snap your hitting arm to full reach above your head. Keep your whole body in the frame.",
+        criteria:[
+          {name:"Whole body visible in frame", test:m => m.vis(27)&&m.vis(28)&&m.vis(0)&&(m.vis(15)||m.vis(16))},
+          {name:"Jump detected", test:(m,S)=> !!S.lastJump},
+          {name:"Contact above the head", test:(m,S)=> !!S.lastHigh},
+          {name:"Full arm extension at contact", test:(m,S)=> !!S.lastExt}
+        ],
+        detect(m, S){
+          if(m.ankleY == null) return null;
+          if(S.base == null) S.base = m.ankleY;
+          if(!S.air) S.base = S.base*0.92 + m.ankleY*0.08;   // track standing level
+          const airborne = m.ankleY < S.base - 0.06;
+          if(airborne){
+            S.air = true;
+            if(S.apexY == null || m.ankleY < S.apexY){        // new highest point
+              S.apexY = m.ankleY;
+              S.apexWristY = Math.min(m.wL.y, m.wR.y);         // highest hand = hitting arm
+              S.apexNoseY = m.noseY;
+              S.apexElbow = (m.wL.y < m.wR.y) ? m.elbowL : m.elbowR;
+            }
+          } else if(S.air){                                    // landed -> grade the attempt
+            S.air = false;
+            S.lastJump = true;
+            S.lastHigh = S.apexWristY != null && S.apexWristY < S.apexNoseY - 0.02;
+            S.lastExt  = S.apexElbow != null && S.apexElbow > 150;
+            const high = S.lastHigh, ext = S.lastExt;
+            S.apexY = S.apexWristY = S.apexElbow = null;
+            if(high && ext) return {good:true,  msg:"Strong spike — high contact above your head with a full arm reach!"};
+            if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest."};
+            return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow."};
+          }
+          return null;
+        }
+      },
+      set: {
+        type:"skill", category:"volleyball", label:"Set", angleName:"Elbow angle",
+        measure:lm => jointAngle(lm, "elbow", ["shoulder","elbow","wrist"]),
+        hint:"Make a window above your forehead, push evenly through both hands, and finish tall with arms extended.",
+        criteria:[
+          {name:"Hands up at the forehead", test:m => m.wL.y<m.shoulderY && m.wR.y<m.shoulderY},
+          {name:"Elbows bent ~90°, up & out", test:m => m.elbowL!=null&&m.elbowR!=null && m.elbowL>55&&m.elbowL<120 && m.elbowR>55&&m.elbowR<120},
+          {name:"Hands even (symmetric window)", test:m => Math.abs(m.wL.y-m.wR.y) < 0.07}
+        ],
+        detect(m, S){
+          if(m.elbowL==null || m.elbowR==null) return null;
+          const ready = m.wL.y<m.shoulderY && m.wR.y<m.shoulderY && m.elbowL<120 && m.elbowR<120;
+          if(ready) S.ready = true;
+          const extended = m.elbowL>150 && m.elbowR>150 && m.wL.y<m.noseY && m.wR.y<m.noseY;
+          if(S.ready && extended && !S.counted){
+            S.counted = true; S.ready = false;
+            // evenness judged at release — pushing one hand shows up here
+            if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set."};
+            return {good:true, msg:"Clean set — high hands at the forehead and a full, even extension."};
+          }
+          if(S.counted && m.elbowL<120) S.counted = false;     // re-arm once hands come back down
+          return null;
+        }
+      },
+      receive: {
+        type:"skill", category:"volleyball", label:"Receive (pass)", angleName:"Knee angle",
+        measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
+        hint:"Get low, lock your forearms into one platform low and in front, and angle it toward the target.",
+        criteria:[
+          {name:"Knees bent — athletic base", test:m => m.kneeAngle!=null && m.kneeAngle>=100 && m.kneeAngle<=155},
+          {name:"Arms straight — solid platform", test:m => m.elbowL!=null&&m.elbowR!=null && m.elbowL>160 && m.elbowR>160},
+          {name:"Hands together, low & in front", test:m => m.wristGap < m.shoulderW*0.7 && m.wL.y>m.shoulderY && m.wR.y>m.shoulderY}
+        ],
+        detect(m, S){
+          const ok = this.criteria.every(c => c.test(m, S));
+          if(ok){
+            S.hold = (S.hold||0) + 1;
+            if(S.hold === 10 && !S.counted){ S.counted = true; return {good:true, msg:"Solid platform — knees bent, arms locked. Hold it steady to the target."}; }
+          } else { S.hold = 0; S.counted = false; }
+          return null;
+        }
+      },
       squat: {
+        type:"rep", category:"strength",
         label:"Squat", angleName:"Knee angle", startHigh:true, down:100, up:160, depthTarget:95,
         measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
         phases:[
@@ -866,6 +968,7 @@
         }
       },
       pushup: {
+        type:"rep", category:"strength",
         label:"Push-up", angleName:"Elbow angle", startHigh:true, down:95, up:155, depthTarget:90, orientation:"side",
         measure:lm => jointAngle(lm, "elbow", ["shoulder","elbow","wrist"]),
         phases:[
@@ -881,6 +984,7 @@
         }
       },
       lunge: {
+        type:"rep", category:"strength",
         label:"Reverse lunge", angleName:"Front-knee angle", startHigh:true, down:105, up:160, depthTarget:100, orientation:"side",
         measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
         phases:[
@@ -894,6 +998,7 @@
         }
       },
       bridge: {
+        type:"rep", category:"strength",
         label:"Glute bridge", angleName:"Hip angle", startHigh:false, down:135, up:162, depthTarget:165, orientation:"side",
         measure:lm => jointAngle(lm, "hip", ["shoulder","hip","knee"]),
         phases:[
@@ -910,12 +1015,12 @@
 
     // ---- State ----
     let poseLandmarker = null, draw = null, stream = null, rafId = null;
-    let current = "squat", reps = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
-    let sessionStart = null;
+    let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
+    let skillState = {}, sessionStart = null;
 
     const els = {};
     const ID = id => document.getElementById(id);
-    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","saveSession","exercisePicker","repCount","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
+    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","saveSession","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
 
     function toast(msg){
       const t = ID("toast"); if(!t) return;
@@ -934,28 +1039,43 @@
 
     function buildPicker(){
       els.exercisePicker.innerHTML = "";
-      Object.entries(EXERCISES).forEach(([id, ex])=>{
-        const b = document.createElement("button");
-        b.type = "button"; b.textContent = ex.label; b.dataset.ex = id;
-        b.className = id === current ? "active" : "";
-        b.addEventListener("click", ()=> selectExercise(id));
-        els.exercisePicker.appendChild(b);
+      const groups = {volleyball:"Volleyball skills", strength:"Strength & mobility"};
+      Object.entries(groups).forEach(([cat, label])=>{
+        const entries = Object.entries(EXERCISES).filter(([,e]) => e.category === cat);
+        if(!entries.length) return;
+        const heading = document.createElement("div");
+        heading.className = "picker-group-label"; heading.textContent = label;
+        els.exercisePicker.appendChild(heading);
+        const row = document.createElement("div"); row.className = "picker-row";
+        entries.forEach(([id, ex])=>{
+          const b = document.createElement("button");
+          b.type = "button"; b.textContent = ex.label; b.dataset.ex = id;
+          b.className = id === current ? "active" : "";
+          b.addEventListener("click", ()=> selectExercise(id));
+          row.appendChild(b);
+        });
+        els.exercisePicker.appendChild(row);
       });
     }
-    function renderPhases(activeIdx){
+    // rep exercises: highlight the current phase; skill checks: tick met criteria
+    function renderSteps(states){
       const ex = EXERCISES[current];
-      els.phaseTrack.innerHTML = ex.phases.map((p,i)=>
-        `<li class="${i===activeIdx?"active":""}"><span class="pip"></span>${p.name}</li>`).join("");
+      const items = ex.type === "skill" ? ex.criteria : ex.phases;
+      els.phaseTrack.innerHTML = items.map((it,i)=>
+        `<li class="${states[i]?"active":""}"><span class="pip"></span>${it.name}</li>`).join("");
     }
     function selectExercise(id){
       current = id;
-      reps = 0; stage = "rest"; extremeAngle = null;
-      [...els.exercisePicker.children].forEach(b => b.classList.toggle("active", b.dataset.ex===id));
+      reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
+      const ex = EXERCISES[id];
+      els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex===id));
       els.repCount.textContent = "0";
-      els.angleLabel.textContent = EXERCISES[id].angleName;
+      els.repLabel.textContent = ex.type === "skill" ? "Attempts" : "Reps";
+      els.angleLabel.textContent = ex.angleName;
       els.angleVal.textContent = "—";
-      renderPhases(-1);
-      setCue("info", running ? `Tracking ${EXERCISES[id].label.toLowerCase()}s — get into your start position.` : `Selected ${EXERCISES[id].label}. Start the camera to begin.`);
+      renderSteps((ex.type === "skill" ? ex.criteria : ex.phases).map(()=>false));
+      const intro = ex.type === "skill" ? ex.hint : `Tracking ${ex.label.toLowerCase()}s — get into your start position.`;
+      setCue("info", running ? intro : `Selected ${ex.label}. Start the camera to begin.`);
     }
 
     async function ensureModel(){
@@ -1034,13 +1154,14 @@
     function processPose(lm){
       currentLm = lm;
       const ex = EXERCISES[current];
+      if(ex.type === "skill"){ processSkill(lm, ex); return; }
       const a = ex.measure(lm);
       if(a == null){ setCue("info", "Can't see the key joints clearly — adjust your position or lighting."); return; }
       els.angleVal.textContent = Math.round(a) + "°";
 
       // phase highlight
       let phaseIdx = ex.phases.findIndex(p => p.test(a));
-      renderPhases(phaseIdx);
+      renderSteps(ex.phases.map((_,i)=> i===phaseIdx));
 
       // rep state machine (handles both flexion-led and extension-led movements)
       if(ex.startHigh){
@@ -1064,6 +1185,26 @@
       if(navigator.vibrate) navigator.vibrate(30);
     }
 
+    // Volleyball technique checks: tick live criteria, grade each completed attempt.
+    function processSkill(lm, ex){
+      const m = metrics(lm);
+      const a = ex.measure(lm);
+      els.angleVal.textContent = (a == null) ? "—" : Math.round(a) + "°";
+      const results = ex.criteria.map(c => !!c.test(m, skillState));
+      renderSteps(results);
+
+      const verdict = ex.detect(m, skillState);
+      if(verdict){
+        reps++; els.repCount.textContent = reps;
+        if(verdict.good) goodAttempts++;
+        setCue(verdict.good ? "good" : "warn", `${ex.label} ${reps}: ${verdict.msg}`);
+        if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
+      } else if(reps === 0){
+        const allMet = results.every(Boolean);
+        setCue(allMet ? "good" : "info", allMet ? "Looking good — hold it." : ex.hint);
+      }
+    }
+
     function saveSession(){
       if(!reps){ toast("No reps to save yet"); return; }
       const key = "bv_training_hub_v1";
@@ -1071,14 +1212,19 @@
       try{ state = JSON.parse(localStorage.getItem(key)) || {}; }catch(e){ state = {}; }
       if(typeof state !== "object" || !state) state = {};
       if(!Array.isArray(state.coachSessions)) state.coachSessions = [];
+      const ex = EXERCISES[current];
+      const isSkill = ex.type === "skill";
       state.coachSessions.push({
         date: new Date().toISOString().slice(0,10),
-        exercise: EXERCISES[current].label,
+        exercise: ex.label,
+        kind: ex.type,
         reps,
+        goodReps: isSkill ? goodAttempts : null,
         durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null,
         savedAt: new Date().toISOString()
       });
-      try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${reps} ${EXERCISES[current].label.toLowerCase()} reps`); }
+      const summary = isSkill ? `${goodAttempts}/${reps} clean ${ex.label.toLowerCase()}s` : `${reps} ${ex.label.toLowerCase()} reps`;
+      try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${summary}`); }
       catch(e){ toast("Save failed — storage may be full"); }
     }
 
@@ -1089,7 +1235,7 @@
       selectExercise(current);
       els.startCam.addEventListener("click", startCamera);
       els.stopCam.addEventListener("click", stopCamera);
-      els.resetReps.addEventListener("click", ()=>{ reps=0; stage="rest"; extremeAngle=null; els.repCount.textContent="0"; setCue("info","Reps reset — go again."); });
+      els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
       els.saveSession.addEventListener("click", saveSession);
       // stop the camera if the user navigates away from the coach page
       window.addEventListener("hashchange", ()=>{ if(running && (location.hash.replace("#","") !== "coach")) stopCamera(); });
