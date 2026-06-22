@@ -576,6 +576,7 @@
             <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
             <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
             <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
+            <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
             <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
           </div>
           <p class="coach-note">Tip: front-facing exercises (squat, glute bridge) work best straight on; push-ups and lunges read best from the side. Reps and feedback are estimates from a single camera — trust your body over the number.</p>
@@ -1017,10 +1018,14 @@
     let poseLandmarker = null, draw = null, stream = null, rafId = null;
     let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
     let skillState = {}, sessionStart = null, trail = [];
+    const TRAIL_NEUTRAL = "130,180,255", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
+    let trailColor = TRAIL_NEUTRAL, ghost = null;
+    const HEAT_COLS = 44, HEAT_ROWS = 33;
+    let heatGrid = new Float32Array(HEAT_COLS * HEAT_ROWS), heatMax = 0, heatOn = false;
 
     const els = {};
     const ID = id => document.getElementById(id);
-    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","saveSession","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
+    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","heatToggle","saveSession","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
 
     function toast(msg){
       const t = ID("toast"); if(!t) return;
@@ -1066,7 +1071,8 @@
     }
     function selectExercise(id){
       current = id;
-      reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {}; trail = [];
+      reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
+      trail = []; trailColor = TRAIL_NEUTRAL; ghost = null; heatGrid.fill(0); heatMax = 0;
       const ex = EXERCISES[id];
       els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex===id));
       els.repCount.textContent = "0";
@@ -1103,7 +1109,7 @@
         els.coachCanvas.height = els.coachVideo.videoHeight;
         draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
         els.stageEmpty.style.display = "none";
-        els.stopCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false;
+        els.stopCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false;
         running = true; sessionStart = Date.now();
         badge("Live", true);
         selectExercise(current);
@@ -1120,7 +1126,7 @@
     }
 
     function stopCamera(){
-      running = false; trail = [];
+      running = false; trail = []; ghost = null; heatGrid.fill(0); heatMax = 0; trailColor = TRAIL_NEUTRAL;
       if(rafId) cancelAnimationFrame(rafId);
       if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
       els.coachVideo.srcObject = null;
@@ -1141,6 +1147,8 @@
         if(res.landmarks && res.landmarks.length){
           const lm = res.landmarks[0];
           updateTrail(lm);
+          drawHeatmap(ctx);
+          drawGhost(ctx);
           drawTrail(ctx);
           draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(33,84,255,.85)", lineWidth:3});
           draw.drawLandmarks(lm, {color:"#caff35", lineWidth:1, radius:4});
@@ -1183,6 +1191,7 @@
       reps++;
       els.repCount.textContent = reps;
       const v = ex.formCheck(currentLm, extreme);
+      onAttempt(v.type === "good");
       setCue(v.type, `Rep ${reps}: ${v.msg}`);
       if(navigator.vibrate) navigator.vibrate(30);
     }
@@ -1199,6 +1208,7 @@
       if(verdict){
         reps++; els.repCount.textContent = reps;
         if(verdict.good) goodAttempts++;
+        onAttempt(verdict.good);
         setCue(verdict.good ? "good" : "warn", `${ex.label} ${reps}: ${verdict.msg}`);
         if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
       } else if(reps === 0){
@@ -1222,23 +1232,59 @@
     function updateTrail(lm){
       const tp = trailPoint(lm);
       if(!tp){ if(trail.length) trail.shift(); return; }   // fade out when the point is lost
-      trail.push({x:tp.x*els.coachCanvas.width, y:tp.y*els.coachCanvas.height});
+      const W = els.coachCanvas.width, H = els.coachCanvas.height;
+      trail.push({x:tp.x*W, y:tp.y*H});
       if(trail.length > 26) trail.shift();
+      // accumulate the session heatmap at the tracked point
+      const gx = Math.max(0, Math.min(HEAT_COLS-1, (tp.x*HEAT_COLS)|0));
+      const gy = Math.max(0, Math.min(HEAT_ROWS-1, (tp.y*HEAT_ROWS)|0));
+      const v = heatGrid[gy*HEAT_COLS+gx] + 1; heatGrid[gy*HEAT_COLS+gx] = v;
+      if(v > heatMax) heatMax = v;
     }
-    // Fading trajectory ribbon + glowing head, like a ball-arc but for your body.
+    // Record the trajectory of an attempt so a clean rep can be "ghosted".
+    function onAttempt(good){
+      trailColor = good ? TRAIL_GOOD : TRAIL_WARN;
+      if(good && trail.length > 3) ghost = trail.map(p => ({x:p.x, y:p.y}));
+    }
+    // Session hand-position heatmap (inferno-ish ramp), drawn faint under the skeleton.
+    function drawHeatmap(ctx){
+      if(!heatOn || heatMax < 2) return;
+      const W = els.coachCanvas.width, H = els.coachCanvas.height;
+      const cw = W/HEAT_COLS, ch = H/HEAT_ROWS;
+      ctx.save();
+      for(let gy=0; gy<HEAT_ROWS; gy++) for(let gx=0; gx<HEAT_COLS; gx++){
+        const d = heatGrid[gy*HEAT_COLS+gx]; if(!d) continue;
+        const t = Math.min(1, d/heatMax);
+        const r = Math.round(40 + 215*t), g = Math.round(20 + 120*t*t), b = Math.round(90 - 60*t);
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.10 + 0.4*t})`;
+        ctx.fillRect(gx*cw, gy*ch, cw+1, ch+1);
+      }
+      ctx.restore();
+    }
+    function drawGhost(ctx){
+      if(!ghost || ghost.length < 2) return;
+      ctx.save();
+      ctx.setLineDash([6,6]); ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ghost[0].x, ghost[0].y);
+      for(let i=1;i<ghost.length;i++) ctx.lineTo(ghost[i].x, ghost[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Fading trajectory ribbon + glowing head, coloured by attempt quality.
     function drawTrail(ctx){
       if(trail.length < 2) return;
       ctx.save();
       ctx.lineCap = "round"; ctx.lineJoin = "round";
       for(let i=1;i<trail.length;i++){
         const a = trail[i-1], b = trail[i], t = i/trail.length;
-        ctx.strokeStyle = `rgba(202,255,53,${0.10 + 0.65*t})`;
+        ctx.strokeStyle = `rgba(${trailColor},${0.10 + 0.65*t})`;
         ctx.lineWidth = 2 + 9*t;
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
       }
       const head = trail[trail.length-1];
-      ctx.shadowColor = "rgba(202,255,53,.9)"; ctx.shadowBlur = 14;
-      ctx.fillStyle = "rgba(202,255,53,.95)";
+      ctx.shadowColor = `rgba(${trailColor},.9)`; ctx.shadowBlur = 14;
+      ctx.fillStyle = `rgba(${trailColor},.95)`;
       ctx.beginPath(); ctx.arc(head.x, head.y, 7, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2; ctx.stroke();
@@ -1280,7 +1326,8 @@
       selectExercise(current);
       els.startCam.addEventListener("click", startCamera);
       els.stopCam.addEventListener("click", stopCamera);
-      els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
+      els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
+      els.heatToggle.addEventListener("click", ()=>{ heatOn = !heatOn; els.heatToggle.classList.toggle("accent", heatOn); els.heatToggle.textContent = heatOn ? "Heatmap: on" : "Heatmap"; });
       els.saveSession.addEventListener("click", saveSession);
       // stop the camera if the user navigates away from the coach page
       window.addEventListener("hashchange", ()=>{ if(running && (location.hash.replace("#","") !== "coach")) stopCamera(); });
