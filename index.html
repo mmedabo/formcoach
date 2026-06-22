@@ -1234,7 +1234,7 @@
       if(!tp){ if(trail.length) trail.shift(); return; }   // fade out when the point is lost
       const W = els.coachCanvas.width, H = els.coachCanvas.height;
       trail.push({x:tp.x*W, y:tp.y*H});
-      if(trail.length > 26) trail.shift();
+      if(trail.length > 36) trail.shift();
       // accumulate the session heatmap at the tracked point
       const gx = Math.max(0, Math.min(HEAT_COLS-1, (tp.x*HEAT_COLS)|0));
       const gy = Math.max(0, Math.min(HEAT_ROWS-1, (tp.y*HEAT_ROWS)|0));
@@ -1278,20 +1278,20 @@
       ctx.lineCap = "round"; ctx.lineJoin = "round";
       for(let i=1;i<trail.length;i++){
         const a = trail[i-1], b = trail[i], t = i/trail.length;
-        ctx.strokeStyle = `rgba(${trailColor},${0.10 + 0.65*t})`;
-        ctx.lineWidth = 2 + 9*t;
+        ctx.strokeStyle = `rgba(${trailColor},${0.12 + 0.7*t})`;
+        ctx.lineWidth = 5 + 18*t;
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
       }
       const head = trail[trail.length-1];
-      ctx.shadowColor = `rgba(${trailColor},.9)`; ctx.shadowBlur = 14;
+      ctx.shadowColor = `rgba(${trailColor},.95)`; ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(${trailColor},.95)`;
-      ctx.beginPath(); ctx.arc(head.x, head.y, 7, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(head.x, head.y, 12, 0, Math.PI*2); ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
       if(current === "spike"){                                // ring the highest point = contact apex
         let peak = trail[0]; for(const p of trail) if(p.y < peak.y) peak = p;
-        ctx.strokeStyle = "rgba(33,84,255,.95)"; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(peak.x, peak.y, 15, 0, Math.PI*2); ctx.stroke();
+        ctx.strokeStyle = "rgba(33,84,255,.95)"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(peak.x, peak.y, 20, 0, Math.PI*2); ctx.stroke();
       }
       ctx.restore();
     }
