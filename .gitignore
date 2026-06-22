@@ -1,0 +1,15 @@
+# Python (analysis tool)
+__pycache__/
+*.pyc
+.venv/
+analysis/.venv/
+
+# Generated analysis outputs
+heatmap.png
+ball_arc.png
+rallies.png
+frames/
+*.pt
+
+# OS
+.DS_Store

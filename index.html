@@ -1016,7 +1016,7 @@
     // ---- State ----
     let poseLandmarker = null, draw = null, stream = null, rafId = null;
     let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
-    let skillState = {}, sessionStart = null;
+    let skillState = {}, sessionStart = null, trail = [];
 
     const els = {};
     const ID = id => document.getElementById(id);
@@ -1066,7 +1066,7 @@
     }
     function selectExercise(id){
       current = id;
-      reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
+      reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {}; trail = [];
       const ex = EXERCISES[id];
       els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex===id));
       els.repCount.textContent = "0";
@@ -1120,7 +1120,7 @@
     }
 
     function stopCamera(){
-      running = false;
+      running = false; trail = [];
       if(rafId) cancelAnimationFrame(rafId);
       if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
       els.coachVideo.srcObject = null;
@@ -1140,6 +1140,8 @@
         ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
         if(res.landmarks && res.landmarks.length){
           const lm = res.landmarks[0];
+          updateTrail(lm);
+          drawTrail(ctx);
           draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(33,84,255,.85)", lineWidth:3});
           draw.drawLandmarks(lm, {color:"#caff35", lineWidth:1, radius:4});
           processPose(lm);
@@ -1203,6 +1205,49 @@
         const allMet = results.every(Boolean);
         setCue(allMet ? "good" : "info", allMet ? "Looking good — hold it." : ex.hint);
       }
+    }
+
+    // The body point whose motion we trail, chosen per exercise.
+    function trailPoint(lm){
+      const g = i => lm[i];
+      const mid = (a,b) => ({x:(g(a).x+g(b).x)/2, y:(g(a).y+g(b).y)/2});
+      switch(current){
+        case "spike":   return (visible(lm,15)||visible(lm,16)) ? (g(15).y<g(16).y?g(15):g(16)) : null; // hitting hand
+        case "set":
+        case "receive": return (visible(lm,15)&&visible(lm,16)) ? mid(15,16) : null;                    // hands / platform
+        case "pushup":  return (visible(lm,11)&&visible(lm,12)) ? mid(11,12) : null;                     // shoulders
+        default:        return (visible(lm,23)&&visible(lm,24)) ? mid(23,24) : null;                     // hips
+      }
+    }
+    function updateTrail(lm){
+      const tp = trailPoint(lm);
+      if(!tp){ if(trail.length) trail.shift(); return; }   // fade out when the point is lost
+      trail.push({x:tp.x*els.coachCanvas.width, y:tp.y*els.coachCanvas.height});
+      if(trail.length > 26) trail.shift();
+    }
+    // Fading trajectory ribbon + glowing head, like a ball-arc but for your body.
+    function drawTrail(ctx){
+      if(trail.length < 2) return;
+      ctx.save();
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for(let i=1;i<trail.length;i++){
+        const a = trail[i-1], b = trail[i], t = i/trail.length;
+        ctx.strokeStyle = `rgba(202,255,53,${0.10 + 0.65*t})`;
+        ctx.lineWidth = 2 + 9*t;
+        ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      }
+      const head = trail[trail.length-1];
+      ctx.shadowColor = "rgba(202,255,53,.9)"; ctx.shadowBlur = 14;
+      ctx.fillStyle = "rgba(202,255,53,.95)";
+      ctx.beginPath(); ctx.arc(head.x, head.y, 7, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2; ctx.stroke();
+      if(current === "spike"){                                // ring the highest point = contact apex
+        let peak = trail[0]; for(const p of trail) if(p.y < peak.y) peak = p;
+        ctx.strokeStyle = "rgba(33,84,255,.95)"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(peak.x, peak.y, 15, 0, Math.PI*2); ctx.stroke();
+      }
+      ctx.restore();
     }
 
     function saveSession(){
