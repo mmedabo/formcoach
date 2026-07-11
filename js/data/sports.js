@@ -211,9 +211,9 @@ const volleyballCombined = {
 export const SPORTS = {
   volleyball: {
     id: "volleyball",
-    name: "Volleyball",
+    name: "Beach Volleyball",
     status: "active",
-    blurb: "Beach & indoor. Jump higher, move quicker, and sharpen spike / set / receive technique.",
+    blurb: "International beach volleyball. Jump higher, move quicker on sand, and sharpen spike / set / receive technique.",
     programs: [volleyballSpeed, volleyballStrength, volleyballCombined],
     coach: {
       skillsLabel: "Volleyball skills",

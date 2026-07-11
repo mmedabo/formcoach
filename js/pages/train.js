@@ -74,7 +74,7 @@ function overview(o){
   ];
   return `
     <div class="overview-grid">
-      ${rows.map(([k,val]) => `<div class="ov-card"><div class="k">${k}</div><div class="v" style="font-size:${val.length>22?"14px":"20px"};letter-spacing:${val.length>22?"0":"-.05em"};text-transform:${val.length>22?"none":"uppercase"}">${val}</div></div>`).join("")}
+      ${rows.map(([k,val]) => `<div class="ov-card"><div class="k">${k}</div><div class="v" style="font-size:${val.length>22?"15px":"24px"};letter-spacing:${val.length>22?"0":"-.01em"};text-transform:${val.length>22?"none":"uppercase"}">${val}</div></div>`).join("")}
     </div>
     <div class="ov-card" style="margin-bottom:6px"><div class="k">Focus areas</div><div class="chips">${o.focus.map(f => `<span class="chip">${f}</span>`).join("")}</div></div>`;
 }

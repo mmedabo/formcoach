@@ -1,31 +1,52 @@
 import { SPORTS } from "../data/sports.js";
-import { initNodeCanvas } from "../nodeCanvas.js";
 
-const NODE = (id, x, y, w, dot, title, tag, desc, href) => `
-  <div class="node home-node" id="${id}" data-x="${x}" data-y="${y}" data-w="${w}">
-    <div class="node-head"><span class="pd ${dot}"></span> ${title} <span class="node-tag">${tag}</span></div>
-    <p class="home-node-desc">${desc}</p>
-    <a class="home-node-link" href="${href}">Open <span class="arrow-circle">→</span></a>
-  </div>`;
+// The five-step "flow" — mirrors the reference site's methodology grid.
+const FLOW = [
+  ["01", "Sport",      "choose",    "Beach Volleyball now — Tennis, Basketball & Soccer soon.", "#sports"],
+  ["02", "Program",    "structured","Speed & Agility, Strength & Vertical, or Combined.",       "#train"],
+  ["03", "Build",      "custom",    "Assemble your own plan from blocks & exercises.",          "#build"],
+  ["04", "Form Coach", "real-time", "Reps, skill grading and form cues from your camera.",       "#coach"],
+  ["05", "Track",      "progress",  "Log sessions and export data to tune the coach.",          "#track"],
+];
 
-export function renderHome(app, { sport }){
+const flowCard = ([num, title, tag, desc, href]) => `
+  <a class="flow-card" href="${href}">
+    <div class="flow-num">${num}</div>
+    <h3 class="flow-title">${title} <span class="flow-tag">${tag}</span></h3>
+    <p class="flow-desc">${desc}</p>
+    <span class="flow-arrow">→</span>
+  </a>`;
+
+export function renderHome(app){
   const active = Object.values(SPORTS).filter(s => s.status === "active").length;
   app.className = "page";
   app.innerHTML = `
     <section class="hero">
       <div>
         <p class="eyebrow"><span class="dot"></span> Sport training + computer-vision coach</p>
-        <h1>TRAIN<br><span class="outline-word">SMARTER</span></h1>
-        <p class="hero-copy">Sport-specific programs and a camera <b>Form Coach</b> that grades your movement in real time — wired together like a pipeline. Currently dialed in for <b>${sport.name}</b>.</p>
+        <h1>Train<br>Smarter</h1>
+        <p class="hero-copy">Real-time movement analysis powered by computer vision. Currently optimized for <b>international beach volleyball performance</b>.</p>
         <div class="hero-actions">
           <a class="button" href="#train">Start training <span class="arrow-circle">→</span></a>
-          <a class="button blue" href="#coach">Open Form Coach</a>
+          <a class="button secondary" href="#coach">Open Form Coach</a>
           <a class="button secondary" href="#build">Build a plan</a>
         </div>
       </div>
-      <div class="hero-art">
-        <div class="big-number">${sport.name.slice(0,2).toUpperCase()}</div>
-        <div class="stamp"><span>${active} sport live</span><span>Computer-vision coach</span></div>
+      <div class="cam-card" role="img" aria-label="Beach volleyball athlete spiking a Mikasa BV550C on a court on a Singapore beach at sunset">
+        <div class="cam-media"></div>
+        <div class="cam-scrim"></div>
+        <div class="cam-tag"><div class="k">Vertical jump</div><div class="v">84.2 cm</div></div>
+        <div class="cam-live"><span class="dot"></span> Live</div>
+        <div class="cam-foot">
+          <div class="lab"><span>Form score</span></div>
+          <div class="cam-bar"><i></i></div>
+          <div class="cam-stats"><span>Stability: 92%</span><span>Force: 4.8kN</span></div>
+        </div>
+      </div>
+      <div class="hero-stamp">
+        <span><span class="dot"></span> ${active} sport live</span>
+        <span>Computer-vision coach</span>
+        <span>On-device · private</span>
       </div>
     </section>
 
@@ -33,18 +54,17 @@ export function renderHome(app, { sport }){
       Array(2).fill(`<span><b></b>Jump higher<b></b>Move faster<b></b>Sharper skills<b></b>Fewer injuries<b></b>Track everything</span>`).join("")
     }</div></div>
 
-    <div class="section-head"><h2>The flow</h2><p>Everything connects. Pick a sport, follow or build a program, coach your movement, and track it — drag the nodes to explore.</p></div>
-    <div class="node-canvas home-canvas" id="homeCanvas">
-      <svg class="wires" id="wires"></svg>
-      ${NODE("nSport","10","118","215","g","Sport","choose","Volleyball now — Tennis, Basketball & Soccer soon.","#sports")}
-      ${NODE("nProgram","250","30","235","b","Program","structured","Speed & Agility, Strength & Vertical, or Combined.","#train")}
-      ${NODE("nBuild","250","250","235","y","Build","custom","Assemble your own plan from blocks & exercises.","#build")}
-      ${NODE("nCoach","525","118","235","p","Form Coach","real-time","Reps, skill grading and form cues from your camera.","#coach")}
-      ${NODE("nTrack","800","118","230","g","Track","progress","Log sessions and export data to tune the coach.","#track")}
-    </div>`;
+    <section class="home-section">
+      <div class="section-head">
+        <div><p class="eyebrow"><span class="dot"></span> The methodology</p><h2>The flow</h2></div>
+        <p>Everything connects. Pick a sport, follow or build a program, coach your movement, and track it.</p>
+      </div>
+      <div class="flow-grid">${FLOW.map(flowCard).join("")}</div>
+    </section>
 
-  const ctl = initNodeCanvas(document.getElementById("homeCanvas"), {
-    wires: [["nSport","nProgram","#7cf5a0"],["nProgram","nCoach","#5c8cff"],["nCoach","nTrack","#7cf5a0"],["nProgram","nBuild","#f5d76e"]],
-  });
-  return () => ctl.destroy();
+    <section class="cta">
+      <p class="eyebrow"><span class="dot"></span> Ready when you are</p>
+      <h2>Level up<br><span class="cta-accent">your game</span></h2>
+      <a class="button" href="#coach">Begin technical assessment <span class="arrow-circle">→</span></a>
+    </section>`;
 }

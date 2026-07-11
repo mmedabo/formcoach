@@ -3,23 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Form Coach — Sport Training & CV Coach</title>
-  <meta name="description" content="Sport-specific training programs paired with a real-time computer-vision Form Coach. Volleyball now; more sports coming." />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; worker-src 'self' blob:; font-src 'self'; manifest-src 'self'; base-uri 'self'" />
+  <title>FormCoach — Train Smarter with a Computer-Vision Coach</title>
+  <meta name="description" content="Sport-specific training programs paired with a real-time computer-vision Form Coach. International beach volleyball now; more sports coming." />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com; worker-src 'self' blob:; font-src 'self' https://fonts.gstatic.com; manifest-src 'self'; base-uri 'self'" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles/main.css" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="theme-color" content="#0a0a0a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Form Coach" />
+  <meta name="apple-mobile-web-app-title" content="FormCoach" />
   <link rel="apple-touch-icon" href="icon-180.png" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
 <body>
   <header class="topbar">
     <div class="shell topbar-inner">
-      <a class="brand" href="#home" aria-label="Form Coach home"><span class="brand-mark">FC</span><span>FORM<br>COACH</span></a>
+      <a class="brand" href="#home" aria-label="FormCoach home"><span class="brand-mark">FC</span><span class="brand-dot">.</span></a>
       <nav class="mini-nav" aria-label="Primary">
         <a href="#home" data-nav="home">Home</a>
         <a href="#sports" data-nav="sports">Sports</a>
@@ -34,9 +37,30 @@
 
   <main class="shell" id="app"><div class="empty-state">Loading…</div></main>
 
-  <footer class="shell footer">
-    <span>Form Coach · on-device computer vision · your data stays in your browser</span>
-    <span>Volleyball live · Tennis · Basketball · Soccer soon</span>
+  <footer class="footer shell">
+    <div class="f-col">
+      <div class="f-brand">FormCoach</div>
+      <p>© 2026 Engineered Athletics Lab</p>
+      <p>Built for performance scientists.</p>
+    </div>
+    <div class="f-links">
+      <div>
+        <span class="head">Socials</span>
+        <a href="#coach">Instagram</a>
+        <a href="#coach">Twitter</a>
+        <a href="#coach">Strava</a>
+      </div>
+      <div>
+        <span class="head">Legal</span>
+        <a href="#home">Privacy</a>
+        <a href="#home">Terms</a>
+        <a href="#home">Safety</a>
+      </div>
+    </div>
+    <div class="f-status">
+      <div class="row"><span class="dot"></span> Systems Nominal</div>
+      <p>Latency: 12ms / Uptime: 99.9%</p>
+    </div>
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

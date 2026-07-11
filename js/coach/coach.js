@@ -163,7 +163,7 @@ let skillState = {}, sessionStart = null, trail = [], facing = "user";
 let attemptLog = [], lastAttemptId = null;
 let sportCoach = null, sportName = "", mode = "skills";
 const LOG_KEY = "bv_coach_log_v1";
-const TRAIL_NEUTRAL = "130,180,255", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
+const TRAIL_NEUTRAL = "255,122,47", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
 let trailColor = TRAIL_NEUTRAL, ghost = null;
 const HEAT_COLS = 44, HEAT_ROWS = 33;
 let heatGrid = new Float32Array(HEAT_COLS * HEAT_ROWS), heatMax = 0, heatOn = false;
@@ -285,8 +285,8 @@ function loop(){
     if(res.landmarks && res.landmarks.length){
       const lm = res.landmarks[0];
       updateTrail(lm); drawHeatmap(ctx); drawGhost(ctx); drawTrail(ctx);
-      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(33,84,255,.85)", lineWidth:3});
-      draw.drawLandmarks(lm, {color:"#caff35", lineWidth:1, radius:4});
+      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(255,92,0,.9)", lineWidth:3});
+      draw.drawLandmarks(lm, {color:"#f5f5f0", lineWidth:1, radius:4});
       processPose(lm);
     } else setCue("info", "Step back so your whole body is in the frame.");
   }
@@ -392,7 +392,7 @@ function drawTrail(ctx){
   ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
   if(current === "spike"){
     let peak = trail[0]; for(const p of trail) if(p.y < peak.y) peak = p;
-    ctx.strokeStyle = "rgba(33,84,255,.95)"; ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255,92,0,.95)"; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(peak.x, peak.y, 20, 0, Math.PI*2); ctx.stroke();
   }
   ctx.restore();
@@ -549,7 +549,7 @@ function coachHTML(sport){
   <p class="coach-note canvas-hint">Drag any node by its header to rearrange the canvas · wires follow.</p>`;
 }
 
-const WIRES = [["nodeMove","nodeCoach","#7cf5a0"], ["nodeCoach","nodePreview","#5c8cff"], ["nodeCoach","nodeData","#ff8ad4"]];
+const WIRES = [["nodeMove","nodeCoach","#ff5c00"], ["nodeCoach","nodePreview","#ff7a2f"], ["nodeCoach","nodeData","#666666"]];
 let canvasCtl = null;
 
 export function mountCoach(container, sport){
