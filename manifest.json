@@ -1,8 +1,8 @@
 {
-  "name": "Beach Volleyball Form Coach",
+  "name": "Form Coach — Sport Training & CV Coach",
   "short_name": "Form Coach",
-  "description": "Real-time computer-vision coach for your volleyball spike, set and receive technique.",
-  "start_url": "./#coach",
+  "description": "Sport-specific training programs plus a real-time computer-vision coach for your technique.",
+  "start_url": "./#home",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
