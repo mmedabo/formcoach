@@ -476,59 +476,77 @@ function coachHTML(sport){
   return `
   <div class="page-hero">
     <div><p class="eyebrow"><span class="dot"></span> Computer vision · ${sport.name}</p><h2>Form Coach</h2>
-    <p>Track your <b>${sport.name.toLowerCase()} skills</b> and your <b>workout</b> in real time. The coach watches your joints, grades each attempt against the key checkpoints and tells you exactly what to fix. All on-device; nothing leaves your browser.</p></div>
+    <p>A live movement pipeline: your <b>camera</b> feeds pose tracking, which grades each <b>${sport.name.toLowerCase()} skill</b> or <b>workout</b> rep against its checkpoints. All on-device; nothing leaves your browser.</p></div>
     <span class="route-chip">Live movement tracking</span>
   </div>
-  <div class="coach-grid">
-    <div>
-      <div class="stage" id="coachStage">
-        <video id="coachVideo" playsinline muted></video>
-        <canvas id="coachCanvas"></canvas>
-        <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
-        <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
-      </div>
-      <div class="coach-controls">
-        <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
-        <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
-        <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
-        <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
-        <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
-        <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
-      </div>
-      <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view. Reps and grades are single-camera estimates — trust your body over the number.</p>
-    </div>
-    <div>
-      <div class="mode-toggle">
-        <button type="button" id="modeSkills" class="active">🏐 ${sport.name} skills</button>
-        <button type="button" id="modeWorkout">🏋️ Workout</button>
-      </div>
-      <div class="exercise-picker" id="exercisePicker"></div>
-      <div class="rep-readout">
-        <div class="rep-card"><b id="repCount">0</b><span id="repLabel">Attempts</span></div>
-        <div class="rep-card angle"><b id="angleVal">—</b><span id="angleLabel">Joint angle</span></div>
-      </div>
-      <div class="form-cue info" id="formCue">Pick a movement and start the camera to begin.</div>
-      <div class="feedback-row">
-        <button type="button" class="pick-good" id="fbRight"><b>✓</b>Right call</button>
-        <button type="button" class="pick-bad" id="fbWrong"><b>✗</b>Wrong call</button>
-        <button type="button" id="fbMissed"><b>＋</b>Missed rep</button>
-      </div>
-      <ul class="phase-track" id="phaseTrack"></ul>
-      <details class="data-panel" id="dataPanel">
-        <summary>Session data — for tuning the algorithm</summary>
-        <div class="data-stats">
-          <div>Attempts<b id="dsTotal">0</b></div><div>Good<b id="dsGood">0</b></div>
-          <div>Wrong<b id="dsWrong">0</b></div><div>Missed<b id="dsMissed">0</b></div>
+  <div class="wf-bar">
+    <div class="wf-tabs"><span class="on">Coach</span><span>Skills</span><span>Data</span></div>
+    <div class="wf-title">movement pipeline · ${sport.name.toLowerCase()}</div>
+  </div>
+  <div class="node-canvas">
+    <div class="coach-grid">
+      <div>
+        <div class="node">
+          <div class="node-head"><span class="pd g"></span> Movement <span class="node-tag">input</span></div>
+          <div class="mode-toggle">
+            <button type="button" id="modeSkills" class="active">🏐 ${sport.name} skills</button>
+            <button type="button" id="modeWorkout">🏋️ Workout</button>
+          </div>
+          <div class="exercise-picker" id="exercisePicker"></div>
         </div>
-        <textarea class="data-note" id="dataNote" placeholder="Note an issue or idea — attaches to your last attempt…"></textarea>
-        <div class="data-actions">
-          <button type="button" id="addNote">Attach note</button>
-          <button type="button" id="exportCsv">Export CSV</button>
-          <button type="button" id="exportJson">Export JSON</button>
-          <button type="button" id="copyJson">Copy JSON</button>
-          <button type="button" id="clearLog">Clear log</button>
+        <div class="node">
+          <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
+          <div class="rep-readout">
+            <div class="rep-card"><b id="repCount">0</b><span id="repLabel">Attempts</span></div>
+            <div class="rep-card angle"><b id="angleVal">—</b><span id="angleLabel">Joint angle</span></div>
+          </div>
+          <div class="form-cue info" id="formCue">Pick a movement and start the camera to begin.</div>
+          <ul class="phase-track" id="phaseTrack"></ul>
         </div>
-      </details>
+        <div class="node">
+          <div class="node-head"><span class="pd p"></span> Data <span class="node-tag">tuning</span></div>
+          <div class="feedback-row">
+            <button type="button" class="pick-good" id="fbRight"><b>✓</b>Right call</button>
+            <button type="button" class="pick-bad" id="fbWrong"><b>✗</b>Wrong call</button>
+            <button type="button" id="fbMissed"><b>＋</b>Missed rep</button>
+          </div>
+          <details class="data-panel" id="dataPanel">
+            <summary>Session data — for tuning the algorithm</summary>
+            <div class="data-stats">
+              <div>Attempts<b id="dsTotal">0</b></div><div>Good<b id="dsGood">0</b></div>
+              <div>Wrong<b id="dsWrong">0</b></div><div>Missed<b id="dsMissed">0</b></div>
+            </div>
+            <textarea class="data-note" id="dataNote" placeholder="Note an issue or idea — attaches to your last attempt…"></textarea>
+            <div class="data-actions">
+              <button type="button" id="addNote">Attach note</button>
+              <button type="button" id="exportCsv">Export CSV</button>
+              <button type="button" id="exportJson">Export JSON</button>
+              <button type="button" id="copyJson">Copy JSON</button>
+              <button type="button" id="clearLog">Clear log</button>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div>
+        <div class="node">
+          <div class="node-head"><span class="pd y"></span> Preview <span class="node-tag">camera → pose</span></div>
+          <div class="stage" id="coachStage">
+            <video id="coachVideo" playsinline muted></video>
+            <canvas id="coachCanvas"></canvas>
+            <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
+            <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
+          </div>
+          <div class="coach-controls">
+            <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
+            <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
+            <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
+            <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
+            <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
+            <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
+          </div>
+          <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view. Reps and grades are single-camera estimates — trust your body over the number.</p>
+        </div>
+      </div>
     </div>
   </div>`;
 }
