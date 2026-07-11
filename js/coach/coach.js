@@ -6,6 +6,8 @@
 //  exercise lists; unmountCoach() stops the camera when you navigate away.
 // ============================================================================
 
+import { initNodeCanvas } from "../nodeCanvas.js";
+
 const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 let FilesetResolver, PoseLandmarker, DrawingUtils;
 
@@ -485,7 +487,7 @@ function coachHTML(sport){
   </div>
   <div class="node-canvas" id="nodeCanvas">
     <svg class="wires" id="wires"></svg>
-    <div class="node" id="nodeMove">
+    <div class="node" id="nodeMove" data-x="10" data-y="44" data-w="270">
       <div class="node-head"><span class="pd g"></span> Movement <span class="node-tag">input</span></div>
       <div class="mode-toggle">
         <button type="button" id="modeSkills" class="active">🏐 ${sport.name} skills</button>
@@ -493,7 +495,7 @@ function coachHTML(sport){
       </div>
       <div class="exercise-picker" id="exercisePicker"></div>
     </div>
-    <div class="node" id="nodePreview">
+    <div class="node" id="nodePreview" data-x="632" data-y="14" data-w="440">
       <div class="node-head"><span class="pd y"></span> Preview <span class="node-tag">camera → pose</span></div>
       <div class="stage" id="coachStage">
         <video id="coachVideo" playsinline muted></video>
@@ -511,7 +513,7 @@ function coachHTML(sport){
       </div>
       <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view.</p>
     </div>
-    <div class="node" id="nodeCoach">
+    <div class="node" id="nodeCoach" data-x="300" data-y="14" data-w="310">
       <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
       <div class="rep-readout">
         <div class="rep-card"><b id="repCount">0</b><span id="repLabel">Attempts</span></div>
@@ -520,7 +522,7 @@ function coachHTML(sport){
       <div class="form-cue info" id="formCue">Pick a movement and start the camera to begin.</div>
       <ul class="phase-track" id="phaseTrack"></ul>
     </div>
-    <div class="node" id="nodeData">
+    <div class="node" id="nodeData" data-x="300" data-y="398" data-w="310">
       <div class="node-head"><span class="pd p"></span> Data <span class="node-tag">tuning</span></div>
       <div class="feedback-row">
         <button type="button" class="pick-good" id="fbRight"><b>✓</b>Right call</button>
@@ -544,85 +546,11 @@ function coachHTML(sport){
       </details>
     </div>
   </div>
-  <p class="coach-note" id="canvasHint" style="text-align:center;display:none">Drag any node by its header to rearrange the canvas · wires follow.</p>`;
+  <p class="coach-note canvas-hint">Drag any node by its header to rearrange the canvas · wires follow.</p>`;
 }
 
-// ---- Node canvas: free-positioned draggable nodes + drawn wires (desktop) ----
-const LAYOUT = {
-  nodeMove:    { x:10,  y:44,  w:270 },
-  nodeCoach:   { x:300, y:14,  w:310 },
-  nodePreview: { x:632, y:14,  w:440 },
-  nodeData:    { x:300, y:398, w:310 },
-};
 const WIRES = [["nodeMove","nodeCoach","#7cf5a0"], ["nodeCoach","nodePreview","#5c8cff"], ["nodeCoach","nodeData","#ff8ad4"]];
-let canvasApplied = false, onResize = null;
-const isDesktop = () => window.matchMedia("(min-width:1000px)").matches;
-
-function edgeAnchors(a, b){
-  const acx=a.offsetLeft+a.offsetWidth/2, acy=a.offsetTop+a.offsetHeight/2;
-  const bcx=b.offsetLeft+b.offsetWidth/2, bcy=b.offsetTop+b.offsetHeight/2;
-  if(Math.abs(bcx-acx) >= Math.abs(bcy-acy)){                       // horizontal link
-    return bcx>acx ? [{x:a.offsetLeft+a.offsetWidth,y:acy},{x:b.offsetLeft,y:bcy},true]
-                   : [{x:a.offsetLeft,y:acy},{x:b.offsetLeft+b.offsetWidth,y:bcy},true];
-  }                                                                  // vertical link
-  return bcy>acy ? [{x:acx,y:a.offsetTop+a.offsetHeight},{x:bcx,y:b.offsetTop},false]
-                 : [{x:acx,y:a.offsetTop},{x:bcx,y:b.offsetTop+b.offsetHeight},false];
-}
-function drawWires(){
-  const svg = ID("wires"), canvas = ID("nodeCanvas"); if(!svg || !canvas) return;
-  svg.setAttribute("width", canvas.clientWidth); svg.setAttribute("height", canvas.clientHeight);
-  let out = "";
-  for(const [from,to,col] of WIRES){
-    const a = ID(from), b = ID(to); if(!a || !b) continue;
-    const [p1,p2,horiz] = edgeAnchors(a, b);
-    const d = Math.max(45, (horiz ? Math.abs(p2.x-p1.x) : Math.abs(p2.y-p1.y))/2);
-    const path = horiz ? `M ${p1.x} ${p1.y} C ${p1.x+d} ${p1.y}, ${p2.x-d} ${p2.y}, ${p2.x} ${p2.y}`
-                       : `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y+d}, ${p2.x} ${p2.y-d}, ${p2.x} ${p2.y}`;
-    out += `<path d="${path}" fill="none" stroke="${col}" stroke-width="2" stroke-opacity=".55"/>`
-        +  `<circle cx="${p1.x}" cy="${p1.y}" r="3.5" fill="${col}"/><circle cx="${p2.x}" cy="${p2.y}" r="3.5" fill="${col}"/>`;
-  }
-  svg.innerHTML = out;
-}
-function enableDrag(){
-  const canvas = ID("nodeCanvas"); if(!canvas) return;
-  canvas.querySelectorAll(".node").forEach(node => {
-    const head = node.querySelector(".node-head"); if(!head) return;
-    head.addEventListener("pointerdown", e => {
-      if(!isDesktop()) return;
-      e.preventDefault();
-      const sx = e.clientX, sy = e.clientY, ox = node.offsetLeft, oy = node.offsetTop;
-      node.classList.add("dragging"); head.setPointerCapture(e.pointerId);
-      const move = ev => {
-        let nx = ox + (ev.clientX - sx), ny = oy + (ev.clientY - sy);
-        nx = Math.max(0, Math.min(nx, canvas.clientWidth  - node.offsetWidth));
-        ny = Math.max(0, Math.min(ny, canvas.clientHeight - node.offsetHeight));
-        node.style.left = nx + "px"; node.style.top = ny + "px"; drawWires();
-      };
-      const up = () => { node.classList.remove("dragging"); head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up); };
-      head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
-    });
-  });
-}
-function applyLayout(){
-  for(const id in LAYOUT){ const n = ID(id); if(!n) continue; const p = LAYOUT[id];
-    n.style.left = p.x+"px"; n.style.top = p.y+"px"; n.style.width = p.w+"px"; }
-  enableDrag();
-}
-function resetLayout(){
-  ["nodeMove","nodeCoach","nodePreview","nodeData"].forEach(id => { const n = ID(id); if(n) n.style.cssText = ""; });
-  const svg = ID("wires"); if(svg) svg.innerHTML = "";
-}
-function initCanvas(){
-  const hint = ID("canvasHint");
-  if(isDesktop()){
-    if(!canvasApplied){ applyLayout(); canvasApplied = true; }
-    if(hint) hint.style.display = "block";
-    drawWires();
-  } else {
-    if(canvasApplied){ resetLayout(); canvasApplied = false; }
-    if(hint) hint.style.display = "none";
-  }
-}
+let canvasCtl = null;
 
 export function mountCoach(container, sport){
   container.innerHTML = coachHTML(sport);
@@ -648,16 +576,12 @@ export function mountCoach(container, sport){
   els.exportJson.addEventListener("click", exportJson);
   els.copyJson.addEventListener("click", copyJson);
   els.clearLog.addEventListener("click", clearLog);
-  // node canvas: position, wire and enable dragging (desktop); redraw on resize
+  // node canvas: absolute positioning, wires and dragging on desktop
   els.dataPanel = ID("dataPanel");
-  canvasApplied = false;
-  requestAnimationFrame(initCanvas);
-  onResize = () => initCanvas();
-  window.addEventListener("resize", onResize);
-  if(els.dataPanel) els.dataPanel.addEventListener("toggle", () => { if(canvasApplied) drawWires(); });
+  canvasCtl = initNodeCanvas(ID("nodeCanvas"), { wires: WIRES });
+  if(els.dataPanel) els.dataPanel.addEventListener("toggle", () => canvasCtl && canvasCtl.redraw());
 }
 export function unmountCoach(){
   stopCamera();
-  if(onResize){ window.removeEventListener("resize", onResize); onResize = null; }
-  canvasApplied = false;
+  if(canvasCtl){ canvasCtl.destroy(); canvasCtl = null; }
 }
