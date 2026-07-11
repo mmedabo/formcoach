@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Beach Volleyball Training Hub</title>
   <meta name="description" content="A comprehensive training hub built to help you play better on the sand." />
+  <!-- iOS / mobile PWA: installable to the home screen, launches fullscreen -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Form Coach" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <style>
     :root{
       --paper:#f4f1e8;
@@ -266,6 +275,32 @@
     .form-cue.warn{background:rgba(255,176,32,.16);color:#7a4d00;border-color:rgba(255,176,32,.4)}
     .form-cue.info{background:var(--blue-soft);color:var(--blue);border-color:rgba(33,84,255,.3)}
     .coach-note{font-size:.8rem;color:var(--muted);margin-top:10px;line-height:1.5}
+    /* Data collection: quick feedback + tuning panel */
+    .feedback-row{display:flex;gap:8px;margin:0 0 14px}
+    .feedback-row button{flex:1;appearance:none;border:1px solid var(--line);background:var(--white);border-radius:12px;padding:10px 6px;font:600 .78rem var(--sans);cursor:pointer;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px}
+    .feedback-row button b{font-size:1.05rem;line-height:1}
+    .feedback-row button.pick-good.on{background:var(--lime-soft);border-color:var(--ink)}
+    .feedback-row button.pick-bad.on{background:rgba(255,90,70,.16);border-color:#c0392b}
+    .data-panel{border:1px solid var(--line);border-radius:16px;padding:0 14px;margin-bottom:14px;background:var(--white)}
+    .data-panel>summary{cursor:pointer;padding:13px 0;font:600 .88rem var(--sans);list-style:none}
+    .data-panel>summary::-webkit-details-marker{display:none}
+    .data-panel>summary::after{content:"▾";float:right;color:var(--muted)}
+    .data-panel[open]>summary::after{content:"▴"}
+    .data-stats{display:flex;gap:16px;flex-wrap:wrap;padding-bottom:12px}
+    .data-stats div{font:600 .66rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .data-stats b{display:block;font-family:var(--display);font-size:1.5rem;color:var(--ink)}
+    .data-note{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:9px;font:400 .85rem var(--sans);margin-bottom:10px;resize:vertical;min-height:42px}
+    .data-actions{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:14px}
+    .data-actions button{appearance:none;border:1px solid var(--line-strong);background:var(--white);border-radius:999px;padding:9px 14px;font:600 .78rem var(--sans);cursor:pointer;color:var(--ink)}
+    /* Mobile / phone layout */
+    @media(max-width:600px){
+      .coach-grid{gap:16px}
+      .stage{aspect-ratio:3/4}
+      .coach-controls{gap:8px}
+      .coach-btn{flex:1 1 42%;text-align:center;padding:13px 10px;font-size:.95rem}
+      .exercise-picker button{padding:10px 15px;font-size:.9rem}
+      .rep-card b{font-size:2.2rem}
+    }
   </style>
 </head>
 <body>
@@ -575,6 +610,7 @@
           <div class="coach-controls">
             <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
             <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
+            <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
             <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
             <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
             <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
@@ -589,7 +625,29 @@
             <div class="rep-card angle"><b id="angleVal">—</b><span id="angleLabel">Joint angle</span></div>
           </div>
           <div class="form-cue info" id="formCue">Choose an exercise and start the camera to begin.</div>
+          <div class="feedback-row">
+            <button type="button" class="pick-good" id="fbRight"><b>✓</b>Right call</button>
+            <button type="button" class="pick-bad" id="fbWrong"><b>✗</b>Wrong call</button>
+            <button type="button" id="fbMissed"><b>＋</b>Missed rep</button>
+          </div>
           <ul class="phase-track" id="phaseTrack"></ul>
+          <details class="data-panel" id="dataPanel">
+            <summary>Session data — for tuning the algorithm</summary>
+            <div class="data-stats">
+              <div>Attempts<b id="dsTotal">0</b></div>
+              <div>Good<b id="dsGood">0</b></div>
+              <div>Wrong<b id="dsWrong">0</b></div>
+              <div>Missed<b id="dsMissed">0</b></div>
+            </div>
+            <textarea class="data-note" id="dataNote" placeholder="Note an issue or idea — attaches to your last attempt…"></textarea>
+            <div class="data-actions">
+              <button type="button" id="addNote">Attach note</button>
+              <button type="button" id="exportCsv">Export CSV</button>
+              <button type="button" id="exportJson">Export JSON</button>
+              <button type="button" id="copyJson">Copy JSON</button>
+              <button type="button" id="clearLog">Clear log</button>
+            </div>
+          </details>
         </div>
       </div>
     </section>
@@ -1018,6 +1076,9 @@
     let poseLandmarker = null, draw = null, stream = null, rafId = null;
     let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngle = null, lastCue = null, running = false;
     let skillState = {}, sessionStart = null, trail = [];
+    let facing = "user";                                  // camera: front / rear
+    let attemptLog = [], lastAttemptId = null;            // data-collection log
+    const LOG_KEY = "bv_coach_log_v1";
     const TRAIL_NEUTRAL = "130,180,255", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
     let trailColor = TRAIL_NEUTRAL, ghost = null;
     const HEAT_COLS = 44, HEAT_ROWS = 33;
@@ -1025,7 +1086,7 @@
 
     const els = {};
     const ID = id => document.getElementById(id);
-    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","resetReps","heatToggle","saveSession","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack"].forEach(id => els[id]=ID(id)); }
+    function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","flipCam","resetReps","heatToggle","saveSession","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
 
     function toast(msg){
       const t = ID("toast"); if(!t) return;
@@ -1102,14 +1163,15 @@
         els.startCam.disabled = true;
         await ensureModel();
         badge("Requesting camera…", false);
-        stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:960} }, audio:false });
+        stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:facing, width:{ideal:1280}, height:{ideal:960} }, audio:false });
         els.coachVideo.srcObject = stream;
         await els.coachVideo.play();
         els.coachCanvas.width = els.coachVideo.videoWidth;
         els.coachCanvas.height = els.coachVideo.videoHeight;
+        applyMirror();
         draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
         els.stageEmpty.style.display = "none";
-        els.stopCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false;
+        els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false;
         running = true; sessionStart = Date.now();
         badge("Live", true);
         selectExercise(current);
@@ -1133,8 +1195,29 @@
       const ctx = els.coachCanvas.getContext("2d");
       ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
       els.stageEmpty.style.display = "";
-      els.startCam.disabled = false; els.stopCam.disabled = true;
+      els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true;
       badge("Camera off", false);
+    }
+
+    // Front camera is mirrored (selfie); rear camera is not.
+    function applyMirror(){
+      const t = facing === "user" ? "scaleX(-1)" : "none";
+      els.coachVideo.style.transform = t;
+      els.coachCanvas.style.transform = t;
+    }
+    async function flipCamera(){
+      facing = facing === "user" ? "environment" : "user";
+      if(!running){ toast(facing === "user" ? "Front camera (start to use)" : "Rear camera (start to use)"); return; }
+      try{
+        if(stream) stream.getTracks().forEach(t => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:facing, width:{ideal:1280}, height:{ideal:960} }, audio:false });
+        els.coachVideo.srcObject = stream;
+        await els.coachVideo.play();
+        els.coachCanvas.width = els.coachVideo.videoWidth;
+        els.coachCanvas.height = els.coachVideo.videoHeight;
+        applyMirror(); trail = [];
+        toast(facing === "user" ? "Front camera" : "Rear camera");
+      }catch(e){ console.error(e); toast("Couldn't switch camera"); }
     }
 
     function loop(){
@@ -1193,6 +1276,8 @@
       const v = ex.formCheck(currentLm, extreme);
       onAttempt(v.type === "good");
       setCue(v.type, `Rep ${reps}: ${v.msg}`);
+      logAttempt({ exercise:current, label:ex.label, kind:"rep", reps, good:v.type==="good", msg:v.msg,
+                   metrics:{ extreme:rnd(extreme), measure:rnd(ex.measure(currentLm)) } });
       if(navigator.vibrate) navigator.vibrate(30);
     }
 
@@ -1210,6 +1295,7 @@
         if(verdict.good) goodAttempts++;
         onAttempt(verdict.good);
         setCue(verdict.good ? "good" : "warn", `${ex.label} ${reps}: ${verdict.msg}`);
+        logAttempt({ exercise:current, label:ex.label, kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
         if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
       } else if(reps === 0){
         const allMet = results.every(Boolean);
@@ -1319,16 +1405,102 @@
       catch(e){ toast("Save failed — storage may be full"); }
     }
 
+    // ---- Data collection (label attempts to tune the detection algorithm) ----
+    const rnd = v => v == null ? null : Math.round(v);
+    const r3  = v => v == null ? null : +(+v).toFixed(3);
+    function snap(m){ return m ? { kneeAngle:rnd(m.kneeAngle), elbowL:rnd(m.elbowL), elbowR:rnd(m.elbowR),
+      shoulderY:r3(m.shoulderY), wristGap:r3(m.wristGap), ankleY:r3(m.ankleY) } : {}; }
+    function loadLog(){ try{ attemptLog = JSON.parse(localStorage.getItem(LOG_KEY)) || []; }catch(e){ attemptLog = []; }
+      if(!Array.isArray(attemptLog)) attemptLog = []; }
+    function persistLog(){ try{ localStorage.setItem(LOG_KEY, JSON.stringify(attemptLog)); }catch(e){ toast("Log storage is full"); } }
+    function renderDataStats(){
+      if(!els.dsTotal) return;
+      const real = attemptLog.filter(a => a.kind !== "missed" && a.kind !== "note");
+      els.dsTotal.textContent  = real.length;
+      els.dsGood.textContent   = real.filter(a => a.good === true).length;
+      els.dsWrong.textContent  = attemptLog.filter(a => a.userLabel === "wrong").length;
+      els.dsMissed.textContent = attemptLog.filter(a => a.kind === "missed").length;
+    }
+    function logAttempt(rec){
+      rec.id = Date.now() + "-" + Math.random().toString(36).slice(2,7);
+      rec.ts = new Date().toISOString();
+      rec.userLabel = rec.userLabel || null;
+      rec.note = rec.note || "";
+      rec.facing = facing;
+      attemptLog.push(rec);
+      lastAttemptId = rec.id;
+      els.fbRight.classList.remove("on"); els.fbWrong.classList.remove("on");  // new attempt: reset labels
+      persistLog(); renderDataStats();
+    }
+    function labelLast(label){
+      const rec = attemptLog.find(a => a.id === lastAttemptId);
+      if(!rec){ toast("No attempt logged yet"); return; }
+      rec.userLabel = label; persistLog(); renderDataStats();
+      els.fbRight.classList.toggle("on", label === "correct");
+      els.fbWrong.classList.toggle("on", label === "wrong");
+      toast(label === "correct" ? "Marked the call correct" : "Marked the call wrong");
+    }
+    function addSessionNote(){
+      const t = els.dataNote.value.trim();
+      if(!t){ toast("Type a note first"); return; }
+      const rec = attemptLog.find(a => a.id === lastAttemptId);
+      if(rec) rec.note = rec.note ? rec.note + " | " + t : t;
+      else logAttempt({ exercise:current, label:(EXERCISES[current]||{}).label || "—", kind:"note", good:null, msg:"", note:t, metrics:{} });
+      persistLog(); els.dataNote.value = ""; toast("Note saved");
+    }
+    function downloadBlob(data, filename, type){
+      const url = URL.createObjectURL(new Blob([data], {type}));
+      const a = document.createElement("a"); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    function exportCsv(){
+      if(!attemptLog.length){ toast("No data yet"); return; }
+      const cols = ["ts","exercise","kind","reps","good","userLabel","note","msg","facing",
+        "kneeAngle","elbowL","elbowR","shoulderY","wristGap","ankleY","extreme","measure"];
+      const esc = v => { if(v == null) return ""; const s = String(v).replace(/"/g,'""'); return /[",\n]/.test(s) ? `"${s}"` : s; };
+      const rows = [cols.join(",")];
+      for(const a of attemptLog){ const m = a.metrics || {};
+        rows.push(cols.map(c => c in a ? esc(a[c]) : (c in m ? esc(m[c]) : "")).join(",")); }
+      downloadBlob(rows.join("\n"), `form-coach-data-${new Date().toISOString().slice(0,10)}.csv`, "text/csv");
+      toast("CSV exported");
+    }
+    function exportJson(){
+      if(!attemptLog.length){ toast("No data yet"); return; }
+      downloadBlob(JSON.stringify(attemptLog, null, 2), `form-coach-data-${new Date().toISOString().slice(0,10)}.json`, "application/json");
+      toast("JSON exported");
+    }
+    async function copyJson(){
+      if(!attemptLog.length){ toast("No data yet"); return; }
+      try{ await navigator.clipboard.writeText(JSON.stringify(attemptLog, null, 2)); toast("JSON copied to clipboard"); }
+      catch(e){ toast("Copy failed — use Export JSON"); }
+    }
+    function clearLog(){
+      if(!attemptLog.length){ toast("Log already empty"); return; }
+      if(!confirm(`Delete all ${attemptLog.length} logged data points?`)) return;
+      attemptLog = []; lastAttemptId = null; persistLog(); renderDataStats(); toast("Log cleared");
+    }
+
     document.addEventListener("DOMContentLoaded", ()=>{
       cache();
       if(!els.exercisePicker) return; // page not present
       buildPicker();
       selectExercise(current);
+      loadLog(); renderDataStats();
       els.startCam.addEventListener("click", startCamera);
       els.stopCam.addEventListener("click", stopCamera);
+      els.flipCam.addEventListener("click", flipCamera);
       els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
       els.heatToggle.addEventListener("click", ()=>{ heatOn = !heatOn; els.heatToggle.classList.toggle("accent", heatOn); els.heatToggle.textContent = heatOn ? "Heatmap: on" : "Heatmap"; });
       els.saveSession.addEventListener("click", saveSession);
+      // data-collection controls
+      els.fbRight.addEventListener("click", ()=> labelLast("correct"));
+      els.fbWrong.addEventListener("click", ()=> labelLast("wrong"));
+      els.fbMissed.addEventListener("click", ()=>{ logAttempt({ exercise:current, label:(EXERCISES[current]||{}).label||"—", kind:"missed", good:null, msg:"user: rep not counted", userLabel:"missed", metrics:{} }); toast("Logged a missed rep"); });
+      els.addNote.addEventListener("click", addSessionNote);
+      els.exportCsv.addEventListener("click", exportCsv);
+      els.exportJson.addEventListener("click", exportJson);
+      els.copyJson.addEventListener("click", copyJson);
+      els.clearLog.addEventListener("click", clearLog);
       // stop the camera if the user navigates away from the coach page
       window.addEventListener("hashchange", ()=>{ if(running && (location.hash.replace("#","") !== "coach")) stopCamera(); });
     });

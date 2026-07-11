@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0d0d0d"/>
+  <!-- motion arc, echoing the tracking trail -->
+  <path d="M96 372 C 180 300, 200 150, 300 132" fill="none" stroke="#2154ff" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="300" cy="132" r="30" fill="#caff35"/>
+  <circle cx="300" cy="132" r="30" fill="none" stroke="#0d0d0d" stroke-width="6"/>
+  <text x="256" y="430" font-family="Arial Narrow, Arial, sans-serif" font-weight="700" font-size="150" fill="#f4f1e8" text-anchor="middle" letter-spacing="4">BV</text>
+</svg>
