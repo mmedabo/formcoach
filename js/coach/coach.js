@@ -162,6 +162,7 @@ let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngl
 let skillState = {}, sessionStart = null, trail = [], facing = "user";
 let attemptLog = [], lastAttemptId = null;
 let sportCoach = null, sportName = "", mode = "skills";
+let sportPrograms = null, workoutSource = "base", currentLabelOverride = null;
 const LOG_KEY = "bv_coach_log_v1";
 const TRAIL_NEUTRAL = "255,122,47", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
 let trailColor = TRAIL_NEUTRAL, ghost = null;
@@ -197,45 +198,126 @@ function toast(msg){ const t = ID("toast"); if(!t) return; t.textContent = msg; 
 function badge(text, live){ els.stageBadgeText.textContent = text; els.stageBadge.classList.toggle("live", !!live); }
 function setCue(type, msg){ if(msg === lastCue) return; lastCue = msg; els.formCue.className = `form-cue ${type}`; els.formCue.textContent = msg; }
 
+// ---- Training-plan ↔ Form-Coach bridge -------------------------------------
+// Map a free-text exercise name (from a program or a custom plan) onto one of
+// the movement patterns the pose coach can actually grade. Returns a detector
+// key (squat/pushup/lunge/bridge) or null when it isn't auto-trackable yet.
+function matchDetector(name){
+  const n = String(name || "").toLowerCase();
+  if(/push[\s-]?up/.test(n)) return "pushup";
+  if(/split squat|bulgarian|lunge/.test(n)) return "lunge";
+  if(/bridge|hip thrust/.test(n)) return "bridge";
+  if(/squat/.test(n)) return "squat";          // back squat, squat jumps, goblet…
+  return null;
+}
+const escHtml = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function readCustomPlans(){ try{ const a = JSON.parse(localStorage.getItem("bv_custom_plans")); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+const exLabel = () => currentLabelOverride || (EXERCISES[current] ? EXERCISES[current].label : "");
+
+// Exercises for the selected workout source, de-duplicated and matched.
+function workoutItems(){
+  let names = [];
+  if(workoutSource === "base"){
+    return (sportCoach.workout || []).filter(id => EXERCISES[id]).map(id => ({ name: EXERCISES[id].label, detector: id }));
+  }
+  const sep = workoutSource.indexOf(":"), kind = workoutSource.slice(0, sep), key = workoutSource.slice(sep + 1);
+  if(kind === "program"){
+    const p = (sportPrograms || []).find(x => x.id === key);
+    if(p && p.days) names = p.days.flatMap(d => (d.blocks || []).flatMap(b => b.items.map(i => i.name)));
+  } else if(kind === "plan"){
+    const p = readCustomPlans()[Number(key)];
+    if(p) names = (p.blocks || []).flatMap(b => (b.items || []).map(i => i.name));
+  }
+  const seen = new Set(), items = [];
+  names.forEach(n => { const k = n.toLowerCase(); if(k && !seen.has(k)){ seen.add(k); items.push({ name: n, detector: matchDetector(n) }); } });
+  return items;
+}
+function sourceOptions(){
+  let html = `<option value="base">Base movements</option>`;
+  (sportPrograms || []).forEach(p => { if(p.days) html += `<option value="program:${p.id}">Program · ${escHtml(p.name)}</option>`; });
+  readCustomPlans().forEach((p, i) => { html += `<option value="plan:${i}">My plan · ${escHtml(p.name)}</option>`; });
+  return html;
+}
+
 function setMode(m){
   mode = m;
   els.modeSkills.classList.toggle("active", m === "skills");
   els.modeWorkout.classList.toggle("active", m === "workout");
   buildPicker();
-  const ids = m === "skills" ? sportCoach.skills : sportCoach.workout;
-  if(ids.length) selectExercise(ids[0]);
+  if(m === "skills"){
+    const ids = (sportCoach.skills || []).filter(id => EXERCISES[id]);
+    if(ids.length) selectExercise(ids[0]);
+  } else {
+    const first = workoutItems().find(it => it.detector);
+    if(first) selectExercise(first.detector, first.name);
+  }
+}
+function chip(label, detector, active){
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label; b.dataset.label = label;
+  if(detector){
+    b.dataset.ex = detector;
+    b.className = active ? "active" : "";
+    b.addEventListener("click", () => selectExercise(detector, label));
+  } else {
+    b.disabled = true; b.className = "untracked"; b.title = "Pose tracking for this exercise isn't available yet";
+  }
+  return b;
 }
 function buildPicker(){
   els.exercisePicker.innerHTML = "";
-  const ids = (mode === "skills" ? sportCoach.skills : sportCoach.workout).filter(id => EXERCISES[id]);
-  const row = document.createElement("div"); row.className = "picker-row";
-  ids.forEach(id => {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = EXERCISES[id].label; b.dataset.ex = id;
-    b.className = id === current ? "active" : "";
-    b.addEventListener("click", () => selectExercise(id));
-    row.appendChild(b);
+  if(mode === "skills"){
+    const row = document.createElement("div"); row.className = "picker-row";
+    (sportCoach.skills || []).filter(id => EXERCISES[id]).forEach(id =>
+      row.appendChild(chip(EXERCISES[id].label, id, id === current)));
+    els.exercisePicker.appendChild(row);
+    return;
+  }
+  // Workout mode: choose a source (base movements / a program / a saved plan),
+  // then pick any of its exercises to track.
+  const sel = document.createElement("select");
+  sel.className = "plan-select wk-source"; sel.innerHTML = sourceOptions(); sel.value = workoutSource;
+  if(sel.value !== workoutSource){ workoutSource = "base"; sel.value = "base"; }   // plan was deleted
+  sel.addEventListener("change", () => {
+    workoutSource = sel.value; buildPicker();
+    const first = workoutItems().find(it => it.detector);
+    if(first) selectExercise(first.detector, first.name);
+    else setCue("info", "None of these are auto-trackable yet — the dimmed ones need pose logic. Pick a base movement to track now.");
   });
+  els.exercisePicker.appendChild(sel);
+
+  const items = workoutItems();
+  const row = document.createElement("div"); row.className = "picker-row";
+  items.forEach(it => row.appendChild(chip(it.name, it.detector, current === it.detector && exLabel() === it.name)));
   els.exercisePicker.appendChild(row);
+
+  if(workoutSource !== "base"){
+    const trackable = items.filter(it => it.detector).length;
+    const note = document.createElement("p"); note.className = "coach-note picker-note";
+    note.textContent = trackable
+      ? `${trackable} of ${items.length} exercise${items.length === 1 ? "" : "s"} can be tracked now — dimmed ones aren't pose-trackable yet.`
+      : "No exercises here are pose-trackable yet — switch to Base movements to track squats, push-ups, lunges or bridges.";
+    els.exercisePicker.appendChild(note);
+  }
 }
 function renderSteps(states){
   const ex = EXERCISES[current];
   const items = ex.type === "skill" ? ex.criteria : ex.phases;
   els.phaseTrack.innerHTML = items.map((it,i)=>`<li class="${states[i]?"active":""}"><span class="pip"></span>${it.name}</li>`).join("");
 }
-function selectExercise(id){
-  current = id;
+function selectExercise(id, labelOverride){
+  current = id; currentLabelOverride = labelOverride || null;
   reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
   trail = []; trailColor = TRAIL_NEUTRAL; ghost = null; heatGrid.fill(0); heatMax = 0;
-  const ex = EXERCISES[id];
-  els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex===id));
+  const ex = EXERCISES[id], label = exLabel();
+  els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex === id && b.dataset.label === label));
   els.repCount.textContent = "0";
   els.repLabel.textContent = ex.type === "skill" ? "Attempts" : "Reps";
   els.angleLabel.textContent = ex.angleName;
   els.angleVal.textContent = "—";
   renderSteps((ex.type === "skill" ? ex.criteria : ex.phases).map(()=>false));
-  const intro = ex.type === "skill" ? ex.hint : `Tracking ${ex.label.toLowerCase()}s — get into your start position.`;
-  setCue("info", running ? intro : `Selected ${ex.label}. Start the camera to begin.`);
+  const intro = ex.type === "skill" ? ex.hint : `Tracking ${label.toLowerCase()} — get into your start position.`;
+  setCue("info", running ? intro : `Selected ${label}. Start the camera to begin.`);
 }
 
 async function ensureModel(){
@@ -339,7 +421,7 @@ function countRep(ex, extreme){
   const v = ex.formCheck(currentLm, extreme);
   onAttempt(v.type === "good");
   setCue(v.type, `Rep ${reps}: ${v.msg}`);
-  logAttempt({ exercise:current, label:ex.label, kind:"rep", reps, good:v.type==="good", msg:v.msg, metrics:{ extreme:rnd(extreme), measure:rnd(ex.measure(currentLm)) } });
+  logAttempt({ exercise:current, label:exLabel(), kind:"rep", reps, good:v.type==="good", msg:v.msg, metrics:{ extreme:rnd(extreme), measure:rnd(ex.measure(currentLm)) } });
   if(navigator.vibrate) navigator.vibrate(30);
 }
 function processSkill(lm, ex){
@@ -353,8 +435,8 @@ function processSkill(lm, ex){
     reps++; els.repCount.textContent = reps;
     if(verdict.good) goodAttempts++;
     onAttempt(verdict.good);
-    setCue(verdict.good ? "good" : "warn", `${ex.label} ${reps}: ${verdict.msg}`);
-    logAttempt({ exercise:current, label:ex.label, kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
+    setCue(verdict.good ? "good" : "warn", `${exLabel()} ${reps}: ${verdict.msg}`);
+    logAttempt({ exercise:current, label:exLabel(), kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
     if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
   } else if(reps === 0){
     const allMet = results.every(Boolean);
@@ -425,10 +507,10 @@ function saveSession(){
   try{ state = JSON.parse(localStorage.getItem(key)) || {}; }catch(e){ state = {}; }
   if(typeof state !== "object" || !state) state = {};
   if(!Array.isArray(state.coachSessions)) state.coachSessions = [];
-  const ex = EXERCISES[current], isSkill = ex.type === "skill";
-  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), sport:sportName, exercise:ex.label, kind:ex.type, reps,
+  const ex = EXERCISES[current], isSkill = ex.type === "skill", label = exLabel();
+  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), sport:sportName, exercise:label, kind:ex.type, reps,
     goodReps: isSkill ? goodAttempts : null, durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null, savedAt:new Date().toISOString() });
-  const summary = isSkill ? `${goodAttempts}/${reps} clean ${ex.label.toLowerCase()}s` : `${reps} ${ex.label.toLowerCase()} reps`;
+  const summary = isSkill ? `${goodAttempts}/${reps} clean ${label.toLowerCase()}s` : `${reps} ${label.toLowerCase()} reps`;
   try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${summary}`); }catch(e){ toast("Save failed — storage may be full"); }
 }
 
@@ -579,9 +661,10 @@ let canvasCtl = null;
 export function mountCoach(container, sport){
   container.innerHTML = coachHTML(sport);
   container.classList.add("page");
-  sportCoach = sport.coach; sportName = sport.name;
+  sportCoach = sport.coach; sportName = sport.name; sportPrograms = sport.programs || [];
   cache();
-  running = false; mode = "skills"; facing = "user"; current = sportCoach.defaultExercise || sportCoach.skills[0];
+  running = false; mode = "skills"; facing = "user"; workoutSource = "base"; currentLabelOverride = null;
+  current = sportCoach.defaultExercise || sportCoach.skills[0];
   buildPicker(); selectExercise(current);
   loadLog(); renderDataStats();
   els.startCam.addEventListener("click", startCamera);
