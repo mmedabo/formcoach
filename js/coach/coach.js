@@ -170,7 +170,28 @@ let heatGrid = new Float32Array(HEAT_COLS * HEAT_ROWS), heatMax = 0, heatOn = fa
 
 const els = {};
 const ID = id => document.getElementById(id);
-function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+function cache(){ ["coachVideo","coachCanvas","coachStage","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+
+// Expand the camera preview to a full-screen overlay so users can watch their
+// own tracking, then minimize back to the normal node when they're done.
+let onKeyDown = null, stagePlaceholder = null;
+function setExpanded(on){
+  const stage = els.coachStage || ID("coachStage"); if(!stage) return;
+  const isOn = stage.classList.contains("expanded");
+  if(on && !isOn){
+    // portal the stage to <body> so position:fixed is viewport-relative even
+    // if an ancestor (page entrance animation, desktop node canvas) has a transform
+    stagePlaceholder = document.createComment("coach-stage");
+    stage.parentNode.insertBefore(stagePlaceholder, stage);
+    document.body.appendChild(stage);
+  } else if(!on && isOn && stagePlaceholder && stagePlaceholder.parentNode){
+    stagePlaceholder.parentNode.insertBefore(stage, stagePlaceholder);
+    stagePlaceholder.remove(); stagePlaceholder = null;
+  }
+  stage.classList.toggle("expanded", on);
+  document.body.classList.toggle("coach-fs", on);
+  if(els.expandCam) els.expandCam.classList.toggle("on", on);
+}
 
 function toast(msg){ const t = ID("toast"); if(!t) return; t.textContent = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2100); }
 function badge(text, live){ els.stageBadgeText.textContent = text; els.stageBadge.classList.toggle("live", !!live); }
@@ -239,7 +260,7 @@ async function startCamera(){
     applyMirror();
     draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
     els.stageEmpty.style.display = "none";
-    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false;
+    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false;
     running = true; sessionStart = Date.now();
     badge("Live", true); selectExercise(current); loop();
   }catch(err){
@@ -258,7 +279,8 @@ function stopCamera(){
     els.coachVideo.srcObject = null;
     const ctx = els.coachCanvas.getContext("2d"); ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
     els.stageEmpty.style.display = "";
-    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true;
+    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true; els.expandCam.disabled = true;
+    setExpanded(false);
     badge("Camera off", false);
   }
 }
@@ -501,11 +523,13 @@ function coachHTML(sport){
         <video id="coachVideo" playsinline muted></video>
         <canvas id="coachCanvas"></canvas>
         <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
+        <button type="button" class="stage-expand-exit" id="minimizeCam" aria-label="Exit full screen">⤡ Minimize</button>
         <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
       </div>
       <div class="coach-controls">
         <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
         <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
+        <button type="button" class="coach-btn" id="expandCam" disabled>⤢ Full screen</button>
         <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
         <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
         <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
@@ -562,6 +586,10 @@ export function mountCoach(container, sport){
   loadLog(); renderDataStats();
   els.startCam.addEventListener("click", startCamera);
   els.stopCam.addEventListener("click", stopCamera);
+  els.expandCam.addEventListener("click", () => setExpanded(!els.coachStage.classList.contains("expanded")));
+  els.minimizeCam.addEventListener("click", () => setExpanded(false));
+  onKeyDown = e => { if(e.key === "Escape") setExpanded(false); };
+  document.addEventListener("keydown", onKeyDown);
   els.flipCam.addEventListener("click", flipCamera);
   els.modeSkills.addEventListener("click", ()=> setMode("skills"));
   els.modeWorkout.addEventListener("click", ()=> setMode("workout"));
@@ -582,6 +610,8 @@ export function mountCoach(container, sport){
   if(els.dataPanel) els.dataPanel.addEventListener("toggle", () => canvasCtl && canvasCtl.redraw());
 }
 export function unmountCoach(){
+  setExpanded(false);
+  if(onKeyDown){ document.removeEventListener("keydown", onKeyDown); onKeyDown = null; }
   stopCamera();
   if(canvasCtl){ canvasCtl.destroy(); canvasCtl = null; }
 }
