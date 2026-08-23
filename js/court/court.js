@@ -11,6 +11,7 @@ let FilesetResolver, PoseLandmarker;
 
 let poseLandmarker = null, stream = null, rafId = null, running = false, facing = "environment";
 let court = null, H = null, calibrating = false, calibPts = [], miniOn = true;
+let onWinResize = null, onFsChange = null, stageHome = null;
 const PALETTE = ["#c6ff4f", "#5c8cff", "#ff8ad4", "#ffb020"];
 const els = {};
 const ID = id => document.getElementById(id);
@@ -90,6 +91,34 @@ async function flipCamera(){
   toast(facing==="environment"?"Rear camera":"Front camera");
 }
 
+// ---- Fullscreen (expand the whole stage so overlays + minimap stay visible) ----
+function fitExpanded(){
+  if(!els.courtStage.classList.contains("expanded")) return;
+  const va = (els.cvVideo.videoWidth / els.cvVideo.videoHeight) || (16/9);
+  let w = window.innerWidth, h = w/va;
+  if(h > window.innerHeight){ h = window.innerHeight; w = h*va; }
+  els.courtStage.style.width = w+"px"; els.courtStage.style.height = h+"px";
+}
+function setExpanded(on){
+  const stage = els.courtStage;
+  if(on){
+    // portal the stage to <body> so its fixed/z-index escapes the glass node's stacking context
+    stageHome = { parent: stage.parentNode, next: stage.nextSibling };
+    document.body.appendChild(stage);
+    stage.classList.add("expanded");
+    fitExpanded();
+    stage.requestFullscreen && stage.requestFullscreen().catch(()=>{});
+  } else {
+    stage.classList.remove("expanded");
+    stage.style.width = ""; stage.style.height = "";
+    if(stageHome){ stageHome.parent.insertBefore(stage, stageHome.next); stageHome = null; }
+    if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+  }
+  els.cvExpand.textContent = on ? "✕" : "⛶";
+  els.cvExpand.title = on ? "Exit fullscreen" : "Fullscreen";
+}
+const toggleExpand = () => setExpanded(!els.courtStage.classList.contains("expanded"));
+
 // ---- Calibration ----
 function startCalibration(){
   calibrating = true; calibPts = []; H = null;
@@ -102,6 +131,7 @@ function updateCalibHint(){
   els.cvHint.textContent = next ? `Calibrating: tap the ${next} court corner (${calibPts.length+1}/4).` : "Calibrated!";
 }
 function onStageTap(e){
+  if(e.target.closest(".cv-expand")) return;   // don't treat the fullscreen button as a corner tap
   if(!calibrating) return;
   const r = els.courtStage.getBoundingClientRect();
   const nx = (e.clientX - r.left)/r.width, ny = (e.clientY - r.top)/r.height;
@@ -188,6 +218,7 @@ function html(sport){
         <video id="cvVideo" playsinline muted></video>
         <canvas id="cvCanvas"></canvas>
         <div class="court-mini" id="miniWrap"><span class="court-mini-label">Live court</span><canvas id="miniMap" width="320" height="176"></canvas></div>
+        <button type="button" class="cv-expand" id="cvExpand" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
         <div class="stage-badge" id="cvBadge"><span class="dot"></span><span id="cvBadgeText">Camera off</span></div>
         <div class="stage-empty" id="cvEmpty"><b>Set up your court</b>Prop the phone so the whole court is in frame, start the camera, then tap the 4 corners to calibrate.</div>
       </div>
@@ -212,7 +243,7 @@ export function mountCourt(container, sport){
   court = sport.court || { length:16, width:8, netAt:8, corners:["near-left","near-right","far-right","far-left"], maxPlayers:4 };
   container.className = "page";
   container.innerHTML = html(sport);
-  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","miniToggle","flipCam","stopCam","cvHint","courtMap","miniMap","miniWrap","cvCount"].forEach(id => els[id]=ID(id));
+  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","miniToggle","flipCam","stopCam","cvHint","courtMap","miniMap","miniWrap","cvCount","cvExpand"].forEach(id => els[id]=ID(id));
   running = false; H = null; calibrating = false; calibPts = []; facing = "environment"; miniOn = true;
   els.startCam.addEventListener("click", startCamera);
   els.stopCam.addEventListener("click", stopCamera);
@@ -225,7 +256,17 @@ export function mountCourt(container, sport){
     els.miniToggle.classList.toggle("accent", miniOn);
   });
   els.miniToggle.classList.add("accent");
+  els.cvExpand.addEventListener("click", toggleExpand);
   els.courtStage.addEventListener("pointerdown", onStageTap);
+  onWinResize = () => fitExpanded();
+  onFsChange = () => { if(!document.fullscreenElement && els.courtStage.classList.contains("expanded")) setExpanded(false); };
+  window.addEventListener("resize", onWinResize);
+  document.addEventListener("fullscreenchange", onFsChange);
   renderCourt(els.courtMap, []); renderCourt(els.miniMap, []);
 }
-export function unmountCourt(){ stopCamera(); }
+export function unmountCourt(){
+  if(els.courtStage && els.courtStage.classList.contains("expanded")) setExpanded(false);  // re-home the portaled stage before teardown
+  stopCamera();
+  if(onWinResize){ window.removeEventListener("resize", onWinResize); onWinResize = null; }
+  if(onFsChange){ document.removeEventListener("fullscreenchange", onFsChange); onFsChange = null; }
+}
