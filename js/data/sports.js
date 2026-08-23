@@ -221,6 +221,11 @@ export const SPORTS = {
       workout: ["squat", "pushup", "lunge", "bridge"],
       defaultExercise: "receive",
     },
+    court: {                    // Court Vision: real beach-volleyball court, metres
+      length: 16, width: 8, netAt: 8,   // net across the middle of the 16 m length
+      corners: ["near-left", "near-right", "far-right", "far-left"],
+      maxPlayers: 4,
+    },
   },
   tennis:     { id: "tennis",     name: "Tennis",     status: "soon", blurb: "Serve power, footwork and rotational strength. Coming soon." },
   basketball: { id: "basketball", name: "Basketball", status: "soon", blurb: "Vertical, agility and finishing under fatigue. Coming soon." },

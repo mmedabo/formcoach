@@ -332,6 +332,19 @@ body.coach-fs .topbar{display:none}
 .node-x{border:none;background:transparent;color:var(--muted);font-size:16px;line-height:1;padding:0 3px;cursor:pointer}
 .node-x:hover{color:#ff6b6b}
 
+/* Court Vision */
+.node-head .pd{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;box-shadow:0 0 8px currentColor}
+.pd.g{background:#7cf5a0;color:#7cf5a0}.pd.b{background:#5c8cff;color:#5c8cff}.pd.y{background:#ffb020;color:#ffb020}.pd.p{background:#ff8ad4;color:#ff8ad4}
+.node-head .node-tag{margin-left:auto;font:600 .6rem var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.court-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.court-grid > .node{position:static;margin:0;width:auto}   /* opt out of the node-canvas absolute rule */
+@media (max-width:900px){ .court-grid{grid-template-columns:1fr} }
+.court-stage{aspect-ratio:16/9;touch-action:none}
+.court-stage video,.court-stage canvas{transform:none}
+.court-map{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:14px;background:#0a0b0f}
+.cv-legend{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;font:600 .78rem var(--sans);color:var(--ink)}
+.cv-legend b{font-family:var(--display);font-size:1.2rem;color:var(--lime);margin-right:4px}
+
 /* ===== Responsive ===== */
 @media (max-width:1160px){
   .flow-grid{grid-template-columns:repeat(3,1fr)}

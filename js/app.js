@@ -7,13 +7,20 @@ import { renderBuilder } from "./pages/builder.js";
 
 const app = document.getElementById("app");
 const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder };
-const NAV = ["home", "sports", "train", "coach", "build", "track"];
+const NAV = ["home", "sports", "train", "coach", "court", "build", "track"];
+
+// Camera-heavy pages are code-split and loaded on demand.
+const LAZY = {
+  coach: { path: "./coach/coach.js", mount: "mountCoach", unmount: "unmountCoach", loading: "Loading Form Coach…" },
+  court: { path: "./court/court.js", mount: "mountCourt", unmount: "unmountCourt", loading: "Loading Court Vision…" },
+};
+const lazyCache = {};
 
 const SPORT_KEY = "bv_active_sport";
 const currentSportId = () => localStorage.getItem(SPORT_KEY) || "volleyball";
 function setSport(id){ if(SPORTS[id] && SPORTS[id].status === "active"){ localStorage.setItem(SPORT_KEY, id); } }
 
-let coachMod = null, pageTeardown = null;
+let pageTeardown = null;
 
 async function route(){
   const page = (location.hash.replace("#","").split("/")[0]) || "home";
@@ -25,16 +32,17 @@ async function route(){
 
   const ctx = { sport: getSport(currentSportId()), setSport };
 
-  if(known === "coach"){
+  if(LAZY[known]){
+    const cfg = LAZY[known];
     app.className = "page";
-    app.innerHTML = `<div class="empty-state">Loading Form Coach…</div>`;
+    app.innerHTML = `<div class="empty-state">${cfg.loading}</div>`;
     try{
-      if(!coachMod) coachMod = await import("./coach/coach.js");
-      coachMod.mountCoach(app, ctx.sport);
-      pageTeardown = () => coachMod.unmountCoach();
+      if(!lazyCache[known]) lazyCache[known] = await import(cfg.path);
+      lazyCache[known][cfg.mount](app, ctx.sport);
+      pageTeardown = () => lazyCache[known][cfg.unmount]();
     }catch(e){
       console.error(e);
-      app.innerHTML = `<div class="empty-state">Couldn't load the Form Coach module. Check your connection and retry.</div>`;
+      app.innerHTML = `<div class="empty-state">Couldn't load this module. Check your connection and retry.</div>`;
     }
     window.scrollTo({ top: 0 });
     return;
