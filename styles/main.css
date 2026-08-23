@@ -354,6 +354,7 @@ body.coach-fs .topbar{display:none}
 .cv-legend b{font-family:var(--display);font-size:1.2rem;color:var(--lime);margin-right:4px}
 .cv-session{margin-top:12px;display:grid;gap:8px}
 .cv-name{width:100%;box-sizing:border-box;border:1px solid var(--line-strong);background:#0e0e0e;border-radius:10px;padding:9px;color:var(--ink);font-size:13px}
+.cv-athlete{margin:10px 0 0}
 .cv-target{font-size:12px;color:var(--muted);line-height:1.4}
 .cv-rec-row{display:flex;align-items:center;gap:10px}
 .cv-rec-time{font:600 .9rem var(--mono);color:var(--muted)}

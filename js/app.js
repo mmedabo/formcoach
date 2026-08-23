@@ -7,12 +7,11 @@ import { renderBuilder } from "./pages/builder.js";
 
 const app = document.getElementById("app");
 const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder };
-const NAV = ["home", "sports", "train", "coach", "court", "build", "track"];
+const NAV = ["home", "sports", "train", "coach", "build", "track"];
 
 // Camera-heavy pages are code-split and loaded on demand.
 const LAZY = {
   coach: { path: "./coach/coach.js", mount: "mountCoach", unmount: "unmountCoach", loading: "Loading Form Coach…" },
-  court: { path: "./court/court.js", mount: "mountCourt", unmount: "unmountCourt", loading: "Loading Court Vision…" },
 };
 const lazyCache = {};
 

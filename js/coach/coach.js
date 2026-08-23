@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { initNodeCanvas } from "../nodeCanvas.js";
+import { computeHomography, applyH, drawCourt } from "../court/mapping.js";
 
 const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 let FilesetResolver, PoseLandmarker, DrawingUtils;
@@ -168,10 +169,14 @@ const TRAIL_NEUTRAL = "255,122,47", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255
 let trailColor = TRAIL_NEUTRAL, ghost = null;
 const HEAT_COLS = 44, HEAT_ROWS = 33;
 let heatGrid = new Float32Array(HEAT_COLS * HEAT_ROWS), heatMax = 0, heatOn = false;
+// court overlay + multi-player target + athlete
+let court = null, H = null, calibrating = false, calibPts = [], courtOn = true;
+let players = [], targetIdx = -1, targetLast = null, athleteName = "";
+let recSamples = [], recDist = 0, lastRecPos = null, lastSampleT = 0;
 
 const els = {};
 const ID = id => document.getElementById(id);
-function cache(){ ["coachVideo","coachCanvas","coachStage","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+function cache(){ ["coachVideo","coachCanvas","coachStage","coachMini","cvMini","athleteName","calibrate","courtToggle","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
 
 // Expand the camera preview to a full-screen overlay so users can watch their
 // own tracking, then minimize back to the normal node when they're done.
@@ -327,8 +332,14 @@ async function ensureModel(){
   const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
-    runningMode:"VIDEO", numPoses:1
+    runningMode:"VIDEO", numPoses: (court && court.maxPlayers) || 4
   });
+}
+// pick the target pose: a locked target is re-acquired by nearest foot, else the largest (closest) person
+function pickTarget(ps){
+  if(!ps.length) return -1;
+  if(targetLast){ let bi=0, bd=Infinity; ps.forEach((p,i)=>{ const d=Math.hypot(p.foot.x-targetLast.x, p.foot.y-targetLast.y); if(d<bd){ bd=d; bi=i; } }); return bi; }
+  let bi=0, ba=-1; ps.forEach((p,i)=>{ if(p.area>ba){ ba=p.area; bi=i; } }); return bi;
 }
 async function startCamera(){
   try{
@@ -342,8 +353,8 @@ async function startCamera(){
     applyMirror();
     draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
     els.stageEmpty.style.display = "none";
-    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false;
-    running = true; sessionStart = Date.now();
+    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false; els.calibrate.disabled = false;
+    running = true; sessionStart = Date.now(); targetLast = null; players = [];
     badge("Live", true); selectExercise(current); loop();
   }catch(err){
     console.error("Camera/model error", err);
@@ -379,20 +390,69 @@ async function flipCamera(){
     toast(facing === "user" ? "Front camera" : "Rear camera");
   }catch(e){ console.error(e); toast("Couldn't switch camera"); }
 }
+// ---- Court calibration + target selection (tap the stage) ----
+function startCalibration(){
+  if(!running){ toast("Start the camera first"); return; }
+  calibrating = true; calibPts = []; H = null; els.calibrate.classList.add("accent");
+  setCue("info", "Tap the 4 court corners: near-left, near-right, far-right, far-left.");
+}
+function onStageTap(e){
+  if(e.target.closest("button")) return;      // ignore the minimize/expand buttons
+  if(!running) return;
+  const r = els.coachStage.getBoundingClientRect();
+  let nx = (e.clientX-r.left)/r.width, ny = (e.clientY-r.top)/r.height;
+  if(facing === "user") nx = 1 - nx;          // front camera is mirrored → convert tap to landmark space
+  if(calibrating){
+    calibPts.push({ x: Math.max(0,Math.min(1,nx)), y: Math.max(0,Math.min(1,ny)) });
+    if(calibPts.length === 4){
+      const dst = [ {x:0,y:0}, {x:court.length,y:0}, {x:court.length,y:court.width}, {x:0,y:court.width} ];
+      H = computeHomography(calibPts, dst); calibrating = false; els.calibrate.classList.remove("accent");
+      recSamples = []; recDist = 0; lastRecPos = null; toast("Court calibrated");
+      setCue("good", "Court calibrated — your position now shows on the mini court.");
+    } else { const nc = court.corners[calibPts.length] || "corner"; setCue("info", `Calibrating: tap the ${nc} corner (${calibPts.length+1}/4).`); }
+    return;
+  }
+  if(!players.length) return;                 // otherwise: pick nearest player as the coached target
+  let best = -1, bd = Infinity;
+  players.forEach((p,i)=>{ const cx=(p.minX+p.maxX)/2, cy=(p.minY+p.maxY)/2; const d=Math.hypot(cx-nx, cy-ny); if(d<bd){ bd=d; best=i; } });
+  if(best >= 0 && bd < 0.3){ targetLast = players[best].foot; skillState = {}; toast(`Targeting ${athleteName || ("player "+(best+1))}`); }
+}
 function loop(){
   if(!running) return;
   const v = els.coachVideo;
   if(v.readyState >= 2){
     const res = poseLandmarker.detectForVideo(v, performance.now());
     const ctx = els.coachCanvas.getContext("2d");
-    ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
+    const W = els.coachCanvas.width, Ht = els.coachCanvas.height;
+    ctx.clearRect(0,0,W,Ht);
     if(res.landmarks && res.landmarks.length){
-      const lm = res.landmarks[0];
-      updateTrail(lm); drawHeatmap(ctx); drawGhost(ctx); drawTrail(ctx);
-      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(255,92,0,.9)", lineWidth:3});
-      draw.drawLandmarks(lm, {color:"#f5f5f0", lineWidth:1, radius:4});
-      processPose(lm);
-    } else setCue("info", "Step back so your whole body is in the frame.");
+      players = res.landmarks.map(lm => {
+        const xs=lm.map(p=>p.x), ys=lm.map(p=>p.y);
+        const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+        const la=lm[27], ra=lm[28];
+        return { lm, minX,maxX,minY,maxY, area:(maxX-minX)*(maxY-minY), foot:{x:(la.x+ra.x)/2, y:Math.max(la.y,ra.y)} };
+      });
+      targetIdx = pickTarget(players);
+      const tp = players[targetIdx];
+      targetLast = tp.foot;
+      // non-target players: dim boxes
+      players.forEach((p,i)=>{ if(i===targetIdx) return;
+        ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=2; ctx.strokeRect(p.minX*W,p.minY*Ht,(p.maxX-p.minX)*W,(p.maxY-p.minY)*Ht);
+        ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(p.minX*W,p.minY*Ht-18,22,18);
+        ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.textAlign="left"; ctx.fillText(i+1, p.minX*W+5, p.minY*Ht-5);
+      });
+      // target: trail + skeleton + grading
+      updateTrail(tp.lm); drawHeatmap(ctx); drawGhost(ctx); drawTrail(ctx);
+      draw.drawConnectors(tp.lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(255,92,0,.9)", lineWidth:3});
+      draw.drawLandmarks(tp.lm, {color:"#f5f5f0", lineWidth:1, radius:4});
+      if(players.length > 1 && athleteName){ ctx.fillStyle="#ff5c00"; ctx.fillRect(tp.minX*W, tp.minY*Ht-20, athleteName.length*8+12, 20); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText(athleteName, tp.minX*W+6, tp.minY*Ht-6); }
+      processPose(tp.lm);
+      // calibration corner markers
+      calibPts.forEach((p,i)=>{ ctx.fillStyle="#ff5c00"; ctx.beginPath(); ctx.arc(p.x*W,p.y*Ht,7,0,7); ctx.fill(); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText(i+1, p.x*W, p.y*Ht+4); });
+      // record the target's court path once the court is calibrated
+      if(H){ const now=performance.now(); if(now-lastSampleT>150){ lastSampleT=now; const pos=applyH(H,tp.foot.x,tp.foot.y); if(lastRecPos) recDist+=Math.hypot(pos.x-lastRecPos.x, pos.y-lastRecPos.y); lastRecPos=pos; recSamples.push({t:Math.round(now-(sessionStart||now)), x:+pos.x.toFixed(2), y:+pos.y.toFixed(2)}); if(recSamples.length>4000) recSamples.shift(); } }
+      if(courtOn && els.coachMini) drawCourt(els.coachMini, court, H, players, {tIdx:targetIdx, tName:athleteName, trail:recSamples});
+    } else { players=[]; setCue("info", "Step back so your whole body is in the frame."); if(courtOn && els.coachMini) drawCourt(els.coachMini, court, H, [], {tName:athleteName}); }
   }
   rafId = requestAnimationFrame(loop);
 }
@@ -508,9 +568,11 @@ function saveSession(){
   if(typeof state !== "object" || !state) state = {};
   if(!Array.isArray(state.coachSessions)) state.coachSessions = [];
   const ex = EXERCISES[current], isSkill = ex.type === "skill", label = exLabel();
-  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), sport:sportName, exercise:label, kind:ex.type, reps,
-    goodReps: isSkill ? goodAttempts : null, durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null, savedAt:new Date().toISOString() });
-  const summary = isSkill ? `${goodAttempts}/${reps} clean ${label.toLowerCase()}s` : `${reps} ${label.toLowerCase()} reps`;
+  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), athlete: athleteName || null, sport:sportName, exercise:label, kind:ex.type, reps,
+    goodReps: isSkill ? goodAttempts : null, durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null,
+    courtDistanceM: H ? +recDist.toFixed(1) : null, courtSamples: H ? recSamples.length : 0, savedAt:new Date().toISOString() });
+  const who = athleteName ? `${athleteName}: ` : "";
+  const summary = isSkill ? `${who}${goodAttempts}/${reps} clean ${label.toLowerCase()}s` : `${who}${reps} ${label.toLowerCase()} reps`;
   try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${summary}`); }catch(e){ toast("Save failed — storage may be full"); }
 }
 
@@ -604,20 +666,24 @@ function coachHTML(sport){
       <div class="stage" id="coachStage">
         <video id="coachVideo" playsinline muted></video>
         <canvas id="coachCanvas"></canvas>
+        <div class="court-mini" id="cvMini"><span class="court-mini-label">Court</span><canvas id="coachMini" width="320" height="160"></canvas></div>
         <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
         <button type="button" class="stage-expand-exit" id="minimizeCam" aria-label="Exit full screen">⤡ Minimize</button>
         <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
       </div>
+      <div class="cv-athlete"><input id="athleteName" class="cv-name" placeholder="Athlete name — then tap them in the frame" autocomplete="off" /></div>
       <div class="coach-controls">
         <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
         <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
         <button type="button" class="coach-btn" id="expandCam" disabled>⤢ Full screen</button>
+        <button type="button" class="coach-btn" id="calibrate" disabled>Calibrate court</button>
+        <button type="button" class="coach-btn" id="courtToggle">Court: on</button>
         <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
         <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
         <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
         <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
       </div>
-      <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view.</p>
+      <p class="coach-note">Tip: multiple people? Type a name and <b>tap the athlete</b> to coach them. Tap <b>Calibrate court</b> then the 4 corners to plot position on the mini court overlay.</p>
     </div>
     <div class="node" id="nodeCoach" data-x="300" data-y="14" data-w="310">
       <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
@@ -662,8 +728,10 @@ export function mountCoach(container, sport){
   container.innerHTML = coachHTML(sport);
   container.classList.add("page");
   sportCoach = sport.coach; sportName = sport.name; sportPrograms = sport.programs || [];
+  court = sport.court || { length:16, width:8, netAt:8, corners:["near-left","near-right","far-right","far-left"], maxPlayers:4 };
   cache();
   running = false; mode = "skills"; facing = "user"; workoutSource = "base"; currentLabelOverride = null;
+  H = null; calibrating = false; calibPts = []; courtOn = true; players = []; targetIdx = -1; targetLast = null; recSamples = []; athleteName = "";
   current = sportCoach.defaultExercise || sportCoach.skills[0];
   buildPicker(); selectExercise(current);
   loadLog(); renderDataStats();
@@ -674,6 +742,11 @@ export function mountCoach(container, sport){
   onKeyDown = e => { if(e.key === "Escape") setExpanded(false); };
   document.addEventListener("keydown", onKeyDown);
   els.flipCam.addEventListener("click", flipCamera);
+  els.calibrate.addEventListener("click", startCalibration);
+  els.courtToggle.addEventListener("click", ()=>{ courtOn = !courtOn; els.cvMini.style.display = courtOn ? "block" : "none"; els.courtToggle.textContent = courtOn ? "Court: on" : "Court: off"; });
+  els.athleteName.addEventListener("input", ()=>{ athleteName = els.athleteName.value.trim(); });
+  els.coachStage.addEventListener("pointerdown", onStageTap);
+  if(els.coachMini) drawCourt(els.coachMini, court, null, [], {});
   els.modeSkills.addEventListener("click", ()=> setMode("skills"));
   els.modeWorkout.addEventListener("click", ()=> setMode("workout"));
   els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
