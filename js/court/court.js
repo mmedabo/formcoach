@@ -10,7 +10,7 @@ const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 let FilesetResolver, PoseLandmarker;
 
 let poseLandmarker = null, stream = null, rafId = null, running = false, facing = "environment";
-let court = null, H = null, calibrating = false, calibPts = [];
+let court = null, H = null, calibrating = false, calibPts = [], miniOn = true;
 const PALETTE = ["#c6ff4f", "#5c8cff", "#ff8ad4", "#ffb020"];
 const els = {};
 const ID = id => document.getElementById(id);
@@ -143,14 +143,15 @@ function loop(){
       ctx.fillStyle=col; ctx.fillRect(p.minX*W, p.minY*Ht-20, 34, 20);
       ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText("P"+(i+1), p.minX*W+5, p.minY*Ht-6);
     });
-    drawMinimap(players);
+    renderCourt(els.courtMap, players);
+    if(miniOn && els.miniMap) renderCourt(els.miniMap, players);
     els.cvCount.textContent = players.length;
   }
   rafId = requestAnimationFrame(loop);
 }
 
-function drawMinimap(players){
-  const cv = els.courtMap, ctx = cv.getContext("2d");
+function renderCourt(cv, players){
+  const ctx = cv.getContext("2d");
   const W = cv.width, Ht = cv.height, pad = 16;
   const sx = (W-2*pad)/court.length, sy = (Ht-2*pad)/court.width;
   ctx.clearRect(0,0,W,Ht);
@@ -186,12 +187,14 @@ function html(sport){
       <div class="stage court-stage" id="courtStage">
         <video id="cvVideo" playsinline muted></video>
         <canvas id="cvCanvas"></canvas>
+        <div class="court-mini" id="miniWrap"><span class="court-mini-label">Live court</span><canvas id="miniMap" width="320" height="176"></canvas></div>
         <div class="stage-badge" id="cvBadge"><span class="dot"></span><span id="cvBadgeText">Camera off</span></div>
         <div class="stage-empty" id="cvEmpty"><b>Set up your court</b>Prop the phone so the whole court is in frame, start the camera, then tap the 4 corners to calibrate.</div>
       </div>
       <div class="coach-controls">
         <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
         <button type="button" class="coach-btn" id="calibrate" disabled>Calibrate court</button>
+        <button type="button" class="coach-btn" id="miniToggle">Minimap: on</button>
         <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
         <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
       </div>
@@ -209,13 +212,20 @@ export function mountCourt(container, sport){
   court = sport.court || { length:16, width:8, netAt:8, corners:["near-left","near-right","far-right","far-left"], maxPlayers:4 };
   container.className = "page";
   container.innerHTML = html(sport);
-  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","flipCam","stopCam","cvHint","courtMap","cvCount"].forEach(id => els[id]=ID(id));
-  running = false; H = null; calibrating = false; calibPts = []; facing = "environment";
+  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","miniToggle","flipCam","stopCam","cvHint","courtMap","miniMap","miniWrap","cvCount"].forEach(id => els[id]=ID(id));
+  running = false; H = null; calibrating = false; calibPts = []; facing = "environment"; miniOn = true;
   els.startCam.addEventListener("click", startCamera);
   els.stopCam.addEventListener("click", stopCamera);
   els.flipCam.addEventListener("click", flipCamera);
   els.calibrate.addEventListener("click", startCalibration);
+  els.miniToggle.addEventListener("click", () => {
+    miniOn = !miniOn;
+    els.miniWrap.style.display = miniOn ? "block" : "none";
+    els.miniToggle.textContent = miniOn ? "Minimap: on" : "Minimap: off";
+    els.miniToggle.classList.toggle("accent", miniOn);
+  });
+  els.miniToggle.classList.add("accent");
   els.courtStage.addEventListener("pointerdown", onStageTap);
-  drawMinimap([]);
+  renderCourt(els.courtMap, []); renderCourt(els.miniMap, []);
 }
 export function unmountCourt(){ stopCamera(); }
