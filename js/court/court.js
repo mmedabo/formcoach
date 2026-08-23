@@ -12,6 +12,14 @@ let FilesetResolver, PoseLandmarker;
 let poseLandmarker = null, stream = null, rafId = null, running = false, facing = "environment";
 let court = null, H = null, calibrating = false, calibPts = [], miniOn = true;
 let onWinResize = null, onFsChange = null, stageHome = null;
+// target selection + recording
+let lastPlayers = [], target = null, targetIdx = -1;
+let recording = false, recStart = 0, recSamples = [], recDist = 0, lastRecPos = null, lastSampleT = 0, recTimer = null;
+const COURT_KEY = "bv_court_sessions";
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const fmtT = sec => { const m = Math.floor(sec/60), s = Math.round(sec%60); return `${m}:${String(s).padStart(2,"0")}`; };
+const readSessions = () => { try{ const a = JSON.parse(localStorage.getItem(COURT_KEY)); return Array.isArray(a) ? a : []; }catch(e){ return []; } };
+const writeSessions = a => { try{ localStorage.setItem(COURT_KEY, JSON.stringify(a)); }catch(e){ toast("Storage full"); } };
 const PALETTE = ["#c6ff4f", "#5c8cff", "#ff8ad4", "#ffb020"];
 const els = {};
 const ID = id => document.getElementById(id);
@@ -74,6 +82,7 @@ async function startCamera(){
   }
 }
 function stopCamera(){
+  if(recording) stopRec();                 // save whatever was captured
   running = false; if(rafId) cancelAnimationFrame(rafId);
   if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
   if(els.cvVideo){ els.cvVideo.srcObject = null; els.cvCanvas.getContext("2d").clearRect(0,0,els.cvCanvas.width,els.cvCanvas.height); }
@@ -132,17 +141,31 @@ function updateCalibHint(){
 }
 function onStageTap(e){
   if(e.target.closest(".cv-expand")) return;   // don't treat the fullscreen button as a corner tap
-  if(!calibrating) return;
   const r = els.courtStage.getBoundingClientRect();
   const nx = (e.clientX - r.left)/r.width, ny = (e.clientY - r.top)/r.height;
-  calibPts.push({ x: Math.max(0,Math.min(1,nx)), y: Math.max(0,Math.min(1,ny)) });
-  if(calibPts.length === 4){
-    const dst = [ {x:0,y:0}, {x:court.length,y:0}, {x:court.length,y:court.width}, {x:0,y:court.width} ];
-    H = computeHomography(calibPts, dst);
-    calibrating = false; els.calibrate.classList.remove("accent");
-    toast("Court calibrated"); badge("Live", true);
+  if(calibrating){
+    calibPts.push({ x: Math.max(0,Math.min(1,nx)), y: Math.max(0,Math.min(1,ny)) });
+    if(calibPts.length === 4){
+      const dst = [ {x:0,y:0}, {x:court.length,y:0}, {x:court.length,y:court.width}, {x:0,y:court.width} ];
+      H = computeHomography(calibPts, dst);
+      calibrating = false; els.calibrate.classList.remove("accent");
+      toast("Court calibrated"); badge("Live", true);
+    }
+    updateCalibHint();
+    return;
   }
-  updateCalibHint();
+  // otherwise: pick the detected player nearest the tap as the target
+  if(!running || !lastPlayers.length) return;
+  let best = null, bd = Infinity;
+  lastPlayers.forEach(p => { const cx=(p.minX+p.maxX)/2, cy=(p.minY+p.maxY)/2; const d=Math.hypot(cx-nx, cy-ny); if(d<bd){ bd=d; best=p; } });
+  if(best && bd < 0.3) setTarget(best);
+}
+function setTarget(p){
+  const name = els.playerName.value.trim() || "Player";
+  target = { name, lastFoot: { x:p.foot.x, y:p.foot.y } };
+  els.targetInfo.textContent = `🎯 ${name} — tap Record to start a session`;
+  els.recordBtn.disabled = false;
+  toast(`Targeting ${name}`);
 }
 
 // ---- Detection loop ----
@@ -163,44 +186,121 @@ function loop(){
       });
     }
     players.sort((a,b)=> a.foot.x - b.foot.x);                     // stable-ish left→right labels
-    // draw calibration markers
+    lastPlayers = players;
+    // re-acquire the selected target each frame by nearest foot position
+    targetIdx = -1;
+    if(target && players.length){
+      let bd = Infinity, bi = -1;
+      players.forEach((p,i)=>{ const d = Math.hypot(p.foot.x-target.lastFoot.x, p.foot.y-target.lastFoot.y); if(d<bd){ bd=d; bi=i; } });
+      if(bi >= 0){ targetIdx = bi; target.lastFoot = players[bi].foot; }
+    }
+    // calibration markers
     calibPts.forEach((p,i)=>{ ctx.fillStyle="#c6ff4f"; ctx.beginPath(); ctx.arc(p.x*W,p.y*Ht,7,0,7); ctx.fill(); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText(i+1, p.x*W, p.y*Ht+4); });
-    // draw player boxes + labels
+    // player boxes + labels (target = lime + name)
     players.forEach((p,i)=>{
-      const col = PALETTE[i%PALETTE.length];
-      ctx.strokeStyle=col; ctx.lineWidth=3;
+      const isT = i === targetIdx;
+      const col = isT ? "#c6ff4f" : PALETTE[i%PALETTE.length];
+      const label = isT ? (target.name || "Target") : ("P"+(i+1));
+      ctx.strokeStyle=col; ctx.lineWidth = isT ? 4 : 3;
       ctx.strokeRect(p.minX*W, p.minY*Ht, (p.maxX-p.minX)*W, (p.maxY-p.minY)*Ht);
-      ctx.fillStyle=col; ctx.fillRect(p.minX*W, p.minY*Ht-20, 34, 20);
-      ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText("P"+(i+1), p.minX*W+5, p.minY*Ht-6);
+      const lw = Math.max(34, label.length*8 + 12);
+      ctx.fillStyle=col; ctx.fillRect(p.minX*W, p.minY*Ht-20, lw, 20);
+      ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText(label, p.minX*W+6, p.minY*Ht-6);
     });
-    renderCourt(els.courtMap, players);
-    if(miniOn && els.miniMap) renderCourt(els.miniMap, players);
+    // record the target's court path
+    if(recording && targetIdx >= 0){
+      const now = performance.now();
+      if(now - lastSampleT > 150){
+        lastSampleT = now;
+        const foot = players[targetIdx].foot;
+        const pos = H ? applyH(H, foot.x, foot.y) : { x: foot.x*court.length, y: foot.y*court.width };
+        if(lastRecPos) recDist += Math.hypot(pos.x-lastRecPos.x, pos.y-lastRecPos.y);
+        lastRecPos = pos;
+        recSamples.push({ t: Math.round(now-recStart), x:+pos.x.toFixed(2), y:+pos.y.toFixed(2) });
+      }
+    }
+    renderCourt(els.courtMap, players, targetIdx, target && target.name);
+    if(miniOn && els.miniMap) renderCourt(els.miniMap, players, targetIdx, target && target.name);
     els.cvCount.textContent = players.length;
   }
   rafId = requestAnimationFrame(loop);
 }
 
-function renderCourt(cv, players){
+function renderCourt(cv, players, tIdx = -1, tName = ""){
   const ctx = cv.getContext("2d");
   const W = cv.width, Ht = cv.height, pad = 16;
   const sx = (W-2*pad)/court.length, sy = (Ht-2*pad)/court.width;
+  const toPx = (x,y) => ({ px: pad + Math.max(0,Math.min(court.length,x))*sx, py: pad + Math.max(0,Math.min(court.width,y))*sy });
   ctx.clearRect(0,0,W,Ht);
-  // court
   ctx.fillStyle = "rgba(92,140,255,.08)"; ctx.fillRect(pad, pad, court.length*sx, court.width*sy);
   ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 2; ctx.strokeRect(pad, pad, court.length*sx, court.width*sy);
   ctx.strokeStyle = "rgba(198,255,79,.8)"; ctx.setLineDash([6,5]);            // net line
   ctx.beginPath(); ctx.moveTo(pad+court.netAt*sx, pad); ctx.lineTo(pad+court.netAt*sx, pad+court.width*sy); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = "rgba(255,255,255,.4)"; ctx.font = "9px monospace"; ctx.textAlign="center"; ctx.fillText("NET", pad+court.netAt*sx, pad-4);
   if(!H){ ctx.fillStyle="rgba(255,255,255,.5)"; ctx.font="12px sans-serif"; ctx.fillText("Calibrate the court to plot players", W/2, Ht/2); return; }
+  // recorded target trail
+  if(recSamples.length > 1){
+    ctx.strokeStyle = "rgba(198,255,79,.5)"; ctx.lineWidth = 2; ctx.beginPath();
+    recSamples.forEach((s,i)=>{ const q = toPx(s.x, s.y); i ? ctx.lineTo(q.px,q.py) : ctx.moveTo(q.px,q.py); });
+    ctx.stroke();
+  }
   players.forEach((p,i)=>{
     const c = applyH(H, p.foot.x, p.foot.y);
     if(c.x < -1 || c.x > court.length+1 || c.y < -1 || c.y > court.width+1) return;   // ignore off-court
-    const px = pad + Math.max(0,Math.min(court.length,c.x))*sx, py = pad + Math.max(0,Math.min(court.width,c.y))*sy;
-    const col = PALETTE[i%PALETTE.length];
-    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(px, py, 8, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
-    ctx.fillStyle = "#0c0d11"; ctx.font = "bold 11px sans-serif"; ctx.textAlign="center"; ctx.fillText("P"+(i+1), px, py+4);
+    const { px, py } = toPx(c.x, c.y);
+    const isT = i === tIdx;
+    const col = isT ? "#c6ff4f" : PALETTE[i%PALETTE.length];
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = isT ? 14 : 10;
+    ctx.beginPath(); ctx.arc(px, py, isT ? 10 : 8, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    if(isT && tName){ ctx.fillStyle = col; ctx.font = "bold 10px sans-serif"; ctx.textAlign="center"; ctx.fillText(tName, px, py-13); }
+    ctx.fillStyle = "#0c0d11"; ctx.font = "bold 11px sans-serif"; ctx.textAlign="center"; ctx.fillText(isT ? "T" : ("P"+(i+1)), px, py+4);
   });
+}
+
+// ---- Recording sessions (per target player, tagged with name + datetime) ----
+function toggleRecord(){
+  if(!target){ toast("Tap a player to target first"); return; }
+  recording ? stopRec() : startRec();
+}
+function startRec(){
+  recording = true; recStart = performance.now(); recSamples = []; recDist = 0; lastRecPos = null; lastSampleT = 0;
+  els.recordBtn.textContent = "■ Stop"; els.recordBtn.classList.add("recording");
+  els.targetInfo.textContent = `● Recording ${target.name}…`;
+  recTimer = setInterval(()=>{ els.recTime.textContent = fmtT((performance.now()-recStart)/1000); }, 500);
+}
+function stopRec(){
+  if(!recording) return;
+  recording = false; clearInterval(recTimer); recTimer = null;
+  els.recordBtn.textContent = "● Record"; els.recordBtn.classList.remove("recording");
+  const dur = Math.round((performance.now()-recStart)/1000);
+  els.recTime.textContent = "0:00";
+  if(recSamples.length < 2){ els.targetInfo.textContent = `🎯 ${target.name}`; toast("Recording too short to save"); return; }
+  const all = readSessions();
+  all.push({ id:"s"+Date.now(), name: target.name, sport: sportName, startedAt: new Date().toISOString(),
+    durationSec: dur, distanceM: +recDist.toFixed(1), samples: recSamples.length, calibrated: !!H, path: recSamples });
+  writeSessions(all); renderSessions();
+  els.targetInfo.textContent = `🎯 ${target.name} — saved (${fmtT(dur)})`;
+  toast(`Saved ${target.name}'s ${fmtT(dur)} session`);
+}
+function renderSessions(){
+  if(!els.sessList) return;
+  const all = readSessions();
+  els.sessCount.textContent = all.length;
+  els.sessList.innerHTML = all.length
+    ? all.slice().reverse().map(s => `<div class="sess-row"><span><b>${esc(s.name)}</b><br><span class="micro">${new Date(s.startedAt).toLocaleString()}</span></span><span class="dose">${fmtT(s.durationSec)} · ${s.distanceM}m</span><button class="node-x" data-del="${s.id}" title="Delete">×</button></div>`).join("")
+    : `<div class="empty-state">No recordings yet — target a player and hit Record.</div>`;
+  els.sessList.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", ()=>{ writeSessions(readSessions().filter(x=>x.id!==b.dataset.del)); renderSessions(); }));
+}
+function exportSessions(){
+  const all = readSessions(); if(!all.length){ toast("No recordings yet"); return; }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(all,null,2)], {type:"application/json"}));
+  const a = document.createElement("a"); a.href = url; a.download = `court-sessions-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); toast("Sessions exported");
+}
+function clearSessions(){
+  if(!readSessions().length){ toast("Nothing to clear"); return; }
+  if(!confirm("Delete all saved court recordings?")) return;
+  writeSessions([]); renderSessions(); toast("Recordings cleared");
 }
 
 // ---- Mount / unmount ----
@@ -234,7 +334,20 @@ function html(sport){
     <div class="node">
       <div class="node-head"><span class="pd b"></span> Live court <span class="node-tag">top-down</span></div>
       <canvas id="courtMap" class="court-map" width="640" height="360"></canvas>
-      <div class="cv-legend"><span><b id="cvCount">0</b> players tracked</span><span class="micro">P1–P4 by court position</span></div>
+      <div class="cv-legend"><span><b id="cvCount">0</b> players tracked</span><span class="micro">tap a player to target</span></div>
+      <div class="cv-session">
+        <input id="playerName" class="cv-name" placeholder="Player name (e.g. Madhav)" autocomplete="off" />
+        <div class="cv-target" id="targetInfo">Tap the player you want to track in the video, then Record.</div>
+        <div class="cv-rec-row">
+          <button type="button" class="coach-btn" id="recordBtn" disabled>● Record</button>
+          <span class="cv-rec-time" id="recTime">0:00</span>
+        </div>
+      </div>
+      <details class="data-panel" id="sessPanel">
+        <summary>Saved recordings <b id="sessCount">0</b></summary>
+        <div id="sessList"></div>
+        <div class="data-actions"><button type="button" id="exportSess">Export all</button><button type="button" id="clearSess">Clear all</button></div>
+      </details>
     </div>
   </div>`;
 }
@@ -243,8 +356,9 @@ export function mountCourt(container, sport){
   court = sport.court || { length:16, width:8, netAt:8, corners:["near-left","near-right","far-right","far-left"], maxPlayers:4 };
   container.className = "page";
   container.innerHTML = html(sport);
-  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","miniToggle","flipCam","stopCam","cvHint","courtMap","miniMap","miniWrap","cvCount","cvExpand"].forEach(id => els[id]=ID(id));
+  ["courtStage","cvVideo","cvCanvas","cvBadge","cvBadgeText","cvEmpty","startCam","calibrate","miniToggle","flipCam","stopCam","cvHint","courtMap","miniMap","miniWrap","cvCount","cvExpand","playerName","targetInfo","recordBtn","recTime","sessPanel","sessList","sessCount","exportSess","clearSess"].forEach(id => els[id]=ID(id));
   running = false; H = null; calibrating = false; calibPts = []; facing = "environment"; miniOn = true;
+  target = null; targetIdx = -1; recording = false; recSamples = []; lastPlayers = [];
   els.startCam.addEventListener("click", startCamera);
   els.stopCam.addEventListener("click", stopCamera);
   els.flipCam.addEventListener("click", flipCamera);
@@ -257,6 +371,11 @@ export function mountCourt(container, sport){
   });
   els.miniToggle.classList.add("accent");
   els.cvExpand.addEventListener("click", toggleExpand);
+  els.recordBtn.addEventListener("click", toggleRecord);
+  els.exportSess.addEventListener("click", exportSessions);
+  els.clearSess.addEventListener("click", clearSessions);
+  els.playerName.addEventListener("input", () => { if(target){ target.name = els.playerName.value.trim() || "Player"; els.targetInfo.textContent = recording ? `● Recording ${target.name}…` : `🎯 ${target.name}`; } });
+  renderSessions();
   els.courtStage.addEventListener("pointerdown", onStageTap);
   onWinResize = () => fitExpanded();
   onFsChange = () => { if(!document.fullscreenElement && els.courtStage.classList.contains("expanded")) setExpanded(false); };

@@ -352,6 +352,16 @@ body.coach-fs .topbar{display:none}
 .court-stage.expanded{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;border-radius:0;box-shadow:0 0 0 100vmax #000}
 .cv-legend{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;font:600 .78rem var(--sans);color:var(--ink)}
 .cv-legend b{font-family:var(--display);font-size:1.2rem;color:var(--lime);margin-right:4px}
+.cv-session{margin-top:12px;display:grid;gap:8px}
+.cv-name{width:100%;box-sizing:border-box;border:1px solid var(--line-strong);background:#0e0e0e;border-radius:10px;padding:9px;color:var(--ink);font-size:13px}
+.cv-target{font-size:12px;color:var(--muted);line-height:1.4}
+.cv-rec-row{display:flex;align-items:center;gap:10px}
+.cv-rec-time{font:600 .9rem var(--mono);color:var(--muted)}
+#recordBtn.recording{background:#ff5a46;border-color:#ff5a46;color:#fff;animation:recpulse 1.2s infinite}
+@keyframes recpulse{50%{opacity:.6}}
+#sessList{max-height:220px;overflow:auto}
+.sess-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding:8px 0;font-size:13px}
+.sess-row .dose{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
 
 /* ===== Responsive ===== */
 @media (max-width:1160px){
