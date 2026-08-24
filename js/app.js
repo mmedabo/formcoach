@@ -62,3 +62,6 @@ function setActiveNav(page){
 window.addEventListener("hashchange", route);
 window.addEventListener("DOMContentLoaded", route);
 if(document.readyState !== "loading") route();
+
+// Network-first service worker → app always loads the latest when online (no more hard-refresh)
+if("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));

@@ -354,7 +354,7 @@ async function startCamera(){
     draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
     els.stageEmpty.style.display = "none";
     els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false; els.calibrate.disabled = false;
-    running = true; sessionStart = Date.now(); targetLast = null; players = [];
+    running = true; sessionStart = Date.now(); targetLast = null; players = []; updateMiniVis();
     badge("Live", true); selectExercise(current); loop();
   }catch(err){
     console.error("Camera/model error", err);
@@ -373,7 +373,7 @@ function stopCamera(){
     const ctx = els.coachCanvas.getContext("2d"); ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
     els.stageEmpty.style.display = "";
     els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true; els.expandCam.disabled = true;
-    setExpanded(false);
+    setExpanded(false); updateMiniVis();
     badge("Camera off", false);
   }
 }
@@ -391,9 +391,10 @@ async function flipCamera(){
   }catch(e){ console.error(e); toast("Couldn't switch camera"); }
 }
 // ---- Court calibration + target selection (tap the stage) ----
+function updateMiniVis(){ if(els.cvMini) els.cvMini.style.display = (courtOn && H && running) ? "block" : "none"; }
 function startCalibration(){
   if(!running){ toast("Start the camera first"); return; }
-  calibrating = true; calibPts = []; H = null; els.calibrate.classList.add("accent");
+  calibrating = true; calibPts = []; H = null; els.calibrate.classList.add("accent"); updateMiniVis();
   setCue("info", "Tap the 4 court corners: near-left, near-right, far-right, far-left.");
 }
 function onStageTap(e){
@@ -407,7 +408,7 @@ function onStageTap(e){
     if(calibPts.length === 4){
       const dst = [ {x:0,y:0}, {x:court.length,y:0}, {x:court.length,y:court.width}, {x:0,y:court.width} ];
       H = computeHomography(calibPts, dst); calibrating = false; els.calibrate.classList.remove("accent");
-      recSamples = []; recDist = 0; lastRecPos = null; toast("Court calibrated");
+      recSamples = []; recDist = 0; lastRecPos = null; updateMiniVis(); toast("Court calibrated");
       setCue("good", "Court calibrated — your position now shows on the mini court.");
     } else { const nc = court.corners[calibPts.length] || "corner"; setCue("info", `Calibrating: tap the ${nc} corner (${calibPts.length+1}/4).`); }
     return;
@@ -451,8 +452,8 @@ function loop(){
       calibPts.forEach((p,i)=>{ ctx.fillStyle="#ff5c00"; ctx.beginPath(); ctx.arc(p.x*W,p.y*Ht,7,0,7); ctx.fill(); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText(i+1, p.x*W, p.y*Ht+4); });
       // record the target's court path once the court is calibrated
       if(H){ const now=performance.now(); if(now-lastSampleT>150){ lastSampleT=now; const pos=applyH(H,tp.foot.x,tp.foot.y); if(lastRecPos) recDist+=Math.hypot(pos.x-lastRecPos.x, pos.y-lastRecPos.y); lastRecPos=pos; recSamples.push({t:Math.round(now-(sessionStart||now)), x:+pos.x.toFixed(2), y:+pos.y.toFixed(2)}); if(recSamples.length>4000) recSamples.shift(); } }
-      if(courtOn && els.coachMini) drawCourt(els.coachMini, court, H, players, {tIdx:targetIdx, tName:athleteName, trail:recSamples});
-    } else { players=[]; setCue("info", "Step back so your whole body is in the frame."); if(courtOn && els.coachMini) drawCourt(els.coachMini, court, H, [], {tName:athleteName}); }
+      if(courtOn && H && els.coachMini) drawCourt(els.coachMini, court, H, players, {tIdx:targetIdx, tName:athleteName, trail:recSamples});
+    } else { players=[]; setCue("info", "Step back so your whole body is in the frame."); if(courtOn && H && els.coachMini) drawCourt(els.coachMini, court, H, [], {tName:athleteName}); }
   }
   rafId = requestAnimationFrame(loop);
 }
@@ -666,7 +667,7 @@ function coachHTML(sport){
       <div class="stage" id="coachStage">
         <video id="coachVideo" playsinline muted></video>
         <canvas id="coachCanvas"></canvas>
-        <div class="court-mini" id="cvMini"><span class="court-mini-label">Court</span><canvas id="coachMini" width="320" height="160"></canvas></div>
+        <div class="court-mini" id="cvMini" style="display:none"><span class="court-mini-label">Live court</span><canvas id="coachMini" width="420" height="210"></canvas></div>
         <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
         <button type="button" class="stage-expand-exit" id="minimizeCam" aria-label="Exit full screen">⤡ Minimize</button>
         <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
@@ -743,10 +744,10 @@ export function mountCoach(container, sport){
   document.addEventListener("keydown", onKeyDown);
   els.flipCam.addEventListener("click", flipCamera);
   els.calibrate.addEventListener("click", startCalibration);
-  els.courtToggle.addEventListener("click", ()=>{ courtOn = !courtOn; els.cvMini.style.display = courtOn ? "block" : "none"; els.courtToggle.textContent = courtOn ? "Court: on" : "Court: off"; });
+  els.courtToggle.addEventListener("click", ()=>{ courtOn = !courtOn; els.courtToggle.textContent = courtOn ? "Court: on" : "Court: off"; updateMiniVis(); });
   els.athleteName.addEventListener("input", ()=>{ athleteName = els.athleteName.value.trim(); });
   els.coachStage.addEventListener("pointerdown", onStageTap);
-  if(els.coachMini) drawCourt(els.coachMini, court, null, [], {});
+  updateMiniVis();
   els.modeSkills.addEventListener("click", ()=> setMode("skills"));
   els.modeWorkout.addEventListener("click", ()=> setMode("workout"));
   els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
