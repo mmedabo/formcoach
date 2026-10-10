@@ -20,13 +20,13 @@ function angle(a, b, c){
   if(!mag) return null;
   return Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
 }
-const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
-function jointAngle(lm, j, indices){
+export const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
+export function jointAngle(lm, j, indices){
   const sides = [];
   for(const S of [L, R]) if(indices.every(k => visible(lm, S[k]))) sides.push(angle(lm[S[indices[0]]], lm[S[indices[1]]], lm[S[indices[2]]]));
   return sides.length ? sides.reduce((s,v)=>s+v,0)/sides.length : null;
 }
-function metrics(lm){
+export function metrics(lm){
   const g = i => lm[i] || {x:0, y:0}; const vis = i => visible(lm, i);
   const sL=g(11), sR=g(12), eL=g(13), eR=g(14), wL=g(15), wR=g(16), aL=g(27), aR=g(28), nose=g(0);
   const elbowL = (vis(11)&&vis(13)&&vis(15)) ? angle(sL,eL,wL) : null;
@@ -40,7 +40,7 @@ function metrics(lm){
 }
 
 // ---- Exercise library ----
-const EXERCISES = {
+export const EXERCISES = {
   spike: {
     type:"skill", label:"Spike (attack)", angleName:"Status", measure:lm => null,
     hint:"Approach, jump, and snap your hitting arm to full reach above your head. Keep your whole body in the frame.",
@@ -217,15 +217,20 @@ function selectExercise(id){
   setCue("info", running ? intro : `Selected ${ex.label}. Start the camera to begin.`);
 }
 
-async function ensureModel(){
-  if(poseLandmarker) return;
-  badge("Loading model…", false);
+// Loads MediaPipe (once) and returns a fresh VIDEO-mode pose landmarker.
+// Shared by the live coach and the offline results analyzer.
+export async function createLandmarker(){
   if(!PoseLandmarker) ({ FilesetResolver, PoseLandmarker, DrawingUtils } = await import(MP_URL));
   const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
-  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+  return PoseLandmarker.createFromOptions(vision, {
     baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
     runningMode:"VIDEO", numPoses:1
   });
+}
+async function ensureModel(){
+  if(poseLandmarker) return;
+  badge("Loading model…", false);
+  poseLandmarker = await createLandmarker();
 }
 async function startCamera(){
   try{
@@ -511,7 +516,7 @@ function coachHTML(sport){
         <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
         <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
       </div>
-      <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view.</p>
+      <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view. Want a scored report? <a href="#results" class="home-node-link" style="display:inline-flex">Analyse a clip in Results →</a></p>
     </div>
     <div class="node" id="nodeCoach" data-x="300" data-y="14" data-w="310">
       <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
