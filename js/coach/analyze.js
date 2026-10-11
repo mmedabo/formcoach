@@ -17,27 +17,32 @@ const seekTo = (v, t) => new Promise(res => {
 });
 
 // One grading step for rep-type exercises — mirrors coach.js processPose/countRep.
-function gradeRepFrame(ex, lm, S){
+function gradeRepFrame(ex, lm, S, t){
   const a = ex.measure(lm);
   if(a == null) return null;
   const idx = ex.phases.findIndex(p => p.test(a));
   if(idx >= 0) S.phasesSeen.add(idx);
+  const mark = () => { S.extreme = a; S.extremeLm = lm; S.extremeT = t; };   // remember the key (extreme) frame
   if(ex.startHigh){
-    if(a < ex.down){ if(S.stage !== "effort"){ S.stage = "effort"; S.extreme = a; } S.extreme = Math.min(S.extreme, a); }
-    else if(a > ex.up && S.stage === "effort"){ S.stage = "rest"; return ex.formCheck(lm, S.extreme); }
+    if(a < ex.down){ if(S.stage !== "effort"){ S.stage = "effort"; mark(); } else if(a < S.extreme) mark(); }
+    else if(a > ex.up && S.stage === "effort"){ S.stage = "rest"; return finishRep(ex, S); }
   } else {
-    if(a > ex.up){ if(S.stage !== "effort"){ S.stage = "effort"; S.extreme = a; } S.extreme = Math.max(S.extreme, a); }
-    else if(a < ex.down && S.stage === "effort"){ S.stage = "rest"; return ex.formCheck(lm, S.extreme); }
+    if(a > ex.up){ if(S.stage !== "effort"){ S.stage = "effort"; mark(); } else if(a > S.extreme) mark(); }
+    else if(a < ex.down && S.stage === "effort"){ S.stage = "rest"; return finishRep(ex, S); }
   }
   return null;
 }
+function finishRep(ex, S){
+  const v = ex.formCheck(S.extremeLm, S.extreme);
+  return { good:v.type==="good", msg:v.msg, type:v.type, focus:v.focus||null, target:v.target??null, lm:S.extremeLm, t:S.extremeT };
+}
 
 // One grading step for skill-type exercises — mirrors coach.js processSkill.
-function gradeSkillFrame(ex, lm, S){
+function gradeSkillFrame(ex, lm, S, t){
   const m = metrics(lm);
   ex.criteria.forEach((c, i) => { if(c.test(m, S)) S.critPass[i]++; });
-  const verdict = ex.detect(m, S);         // detect() mutates S, same as live skillState
-  return verdict ? { good: verdict.good, msg: verdict.msg, type: verdict.good ? "good" : "warn" } : null;
+  const v = ex.detect(m, S);               // detect() mutates S, same as live skillState
+  return v ? { good:v.good, msg:v.msg, type:v.good?"good":"warn", focus:v.focus||null, target:v.target??null, lm, t } : null;
 }
 
 function tally(list){
@@ -67,7 +72,7 @@ export async function analyzeVideoFile(file, exerciseId, onProgress){
       ? { critPass: ex.criteria.map(() => 0) }
       : { stage:"rest", extreme:null, phasesSeen:new Set() };
 
-    const verdicts = [];
+    const verdicts = [], track = [], faults = [];
     let framesWithPose = 0, framesTotal = 0, ts = 0;
     const step = 1 / SAMPLE_FPS;
 
@@ -78,8 +83,14 @@ export async function analyzeVideoFile(file, exerciseId, onProgress){
       if(res.landmarks && res.landmarks.length){
         framesWithPose++;
         const lm = res.landmarks[0];
-        const v = isSkill ? gradeSkillFrame(ex, lm, S) : gradeRepFrame(ex, lm, S);
-        if(v) verdicts.push({ rep: verdicts.length + 1, good: v.type === "good", msg: v.msg, type: v.type });
+        track.push({ t, lm });                 // for the synced skeleton overlay on the clip
+        const v = isSkill ? gradeSkillFrame(ex, lm, S, t) : gradeRepFrame(ex, lm, S, t);
+        if(v){
+          const rep = verdicts.length + 1;
+          verdicts.push({ rep, good: v.type === "good", msg: v.msg, type: v.type });
+          if(!v.good && v.focus && v.lm)       // a fixable fault with a key frame to show
+            faults.push({ rep, t:v.t, focus:v.focus, target:v.target, msg:v.msg, lm:v.lm, exerciseId });
+        }
       }
       if(onProgress) onProgress(Math.min(1, t / duration));
     }
@@ -98,7 +109,7 @@ export async function analyzeVideoFile(file, exerciseId, onProgress){
     return {
       exerciseId, label: ex.label, kind: ex.type, reps, good,
       score: reps ? Math.round((good / reps) * 100) : null,
-      verdicts, corrections, strengths, checkpoints,
+      verdicts, corrections, strengths, checkpoints, faults, track,
       poseCoverage: framesTotal ? framesWithPose / framesTotal : 0,
       videoUrl: url,              // caller owns this; revoke when the screen tears down
       durationSec: Math.round(duration),

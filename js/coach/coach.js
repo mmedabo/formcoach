@@ -68,8 +68,8 @@ export const EXERCISES = {
         const high = S.lastHigh, ext = S.lastExt;
         S.apexY = S.apexWristY = S.apexElbow = null;
         if(high && ext) return {good:true,  msg:"Strong spike — high contact above your head with a full arm reach!"};
-        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest."};
-        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow."};
+        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest.", focus:"reachHigh", target:null};
+        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow.", focus:"elbowExtend", target:170};
       }
       return null;
     }
@@ -90,7 +90,7 @@ export const EXERCISES = {
       const extended = m.elbowL>150 && m.elbowR>150 && m.wL.y<m.noseY && m.wR.y<m.noseY;
       if(S.ready && extended && !S.counted){
         S.counted = true; S.ready = false;
-        if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set."};
+        if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set.", focus:"handsLevel", target:null};
         return {good:true, msg:"Clean set — high hands at the forehead and a full, even extension."};
       }
       if(S.counted && m.elbowL<120) S.counted = false;
@@ -119,9 +119,9 @@ export const EXERCISES = {
     measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
     phases:[{name:"Stand tall", test:a=>a>=155},{name:"Descend with control", test:a=>a<155&&a>=110},{name:"Hit depth, then drive up", test:a=>a<110}],
     formCheck(lm, minAngle){
-      if(minAngle != null && minAngle > 105) return {type:"warn", msg:"Go a little deeper — aim for thighs near parallel."};
+      if(minAngle != null && minAngle > 105) return {type:"warn", msg:"Go a little deeper — aim for thighs near parallel.", focus:"kneeDepth", target:100};
       const torso = jointAngle(lm, "hip", ["shoulder","hip","knee"]);
-      if(torso != null && torso < 55) return {type:"warn", msg:"Chest is dropping — keep your torso taller."};
+      if(torso != null && torso < 55) return {type:"warn", msg:"Chest is dropping — keep your torso taller.", focus:"torsoUpright", target:75};
       return {type:"good", msg:"Clean squat — good depth and posture."};
     }
   },
@@ -131,8 +131,8 @@ export const EXERCISES = {
     phases:[{name:"Top — arms extended", test:a=>a>=150},{name:"Lower your chest", test:a=>a<150&&a>=100},{name:"Reach bottom, then press", test:a=>a<100}],
     formCheck(lm, minAngle){
       const line = jointAngle(lm, "hip", ["shoulder","hip","ankle"]);
-      if(line != null && line < 155) return {type:"warn", msg:"Keep a straight line — don't let hips sag or pike."};
-      if(minAngle != null && minAngle > 100) return {type:"warn", msg:"Lower further — get elbows to about 90°."};
+      if(line != null && line < 155) return {type:"warn", msg:"Keep a straight line — don't let hips sag or pike.", focus:"bodyLine", target:175};
+      if(minAngle != null && minAngle > 100) return {type:"warn", msg:"Lower further — get elbows to about 90°.", focus:"elbowDepth", target:95};
       return {type:"good", msg:"Solid push-up — full range and a straight body."};
     }
   },
@@ -141,7 +141,7 @@ export const EXERCISES = {
     measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
     phases:[{name:"Stand tall", test:a=>a>=155},{name:"Step back and lower", test:a=>a<155&&a>=115},{name:"Front thigh parallel, drive up", test:a=>a<115}],
     formCheck(lm, minAngle){
-      if(minAngle != null && minAngle > 110) return {type:"warn", msg:"Sink lower — front thigh toward parallel."};
+      if(minAngle != null && minAngle > 110) return {type:"warn", msg:"Sink lower — front thigh toward parallel.", focus:"kneeDepth", target:105};
       return {type:"good", msg:"Nice lunge depth — controlled and balanced."};
     }
   },
@@ -150,7 +150,7 @@ export const EXERCISES = {
     measure:lm => jointAngle(lm, "hip", ["shoulder","hip","knee"]),
     phases:[{name:"Hips down to start", test:a=>a<140},{name:"Drive hips up", test:a=>a>=140&&a<162},{name:"Squeeze glutes at top", test:a=>a>=162}],
     formCheck(lm, maxAngle){
-      if(maxAngle != null && maxAngle < 160) return {type:"warn", msg:"Extend further — squeeze hips to full lockout."};
+      if(maxAngle != null && maxAngle < 160) return {type:"warn", msg:"Extend further — squeeze hips to full lockout.", focus:"hipExtend", target:172};
       return {type:"good", msg:"Strong bridge — full hip extension at the top."};
     }
   }

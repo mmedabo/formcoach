@@ -8,6 +8,7 @@
 
 import { EXERCISES } from "../coach/coach.js";
 import { analyzeVideoFile } from "../coach/analyze.js";
+import { getDemoProvider, describeFocus, drawPose, FOCUS } from "../coach/demo.js";
 
 // Which muscles each movement works (presentation only — lives with the output).
 export const MUSCLES = {
@@ -18,6 +19,16 @@ export const MUSCLES = {
   pushup:  ["chest","triceps","shoulders","core"],
   lunge:   ["quads","glutes","hamstrings","core"],
   bridge:  ["glutes","hamstrings","core"],
+};
+// Per-movement filming tip — how to frame the clip so it grades well.
+const FILMING_TIPS = {
+  spike:   "Film from the side, whole body in frame. Capture the approach, jump and arm swing.",
+  set:     "Film front-on at chest height. Keep both hands and elbows visible above the forehead.",
+  receive: "Film from the side or front-on. Get low with your whole body in frame — feet to hands.",
+  squat:   "Film from the side, 2–3 m back. Keep feet, hips and head in frame through the full rep.",
+  pushup:  "Film from the side at floor level. Show shoulders, hips and ankles in one straight line.",
+  lunge:   "Film from the side. Keep the front leg, hips and torso fully in frame.",
+  bridge:  "Film from the side at floor level. Show shoulders, hips and knees.",
 };
 const MUSCLE_NAME = { shoulders:"Shoulders", chest:"Chest", triceps:"Triceps", biceps:"Biceps",
   forearms:"Forearms", lats:"Lats", core:"Core", glutes:"Glutes", quads:"Quads", hamstrings:"Hamstrings" };
@@ -121,6 +132,133 @@ export function cineOutput(r){
   </div>`;
 }
 
+// ---- Side-by-side "mistake vs correct form" player -------------------------
+export function playerHTML(r){
+  if(!r.faults.length){
+    return `<div class="cine-player no-faults">
+      <div class="cp-stage">
+        <div class="cp-pane"><div class="cp-tag">Your form</div>
+          <div class="cp-video"><video id="playClip" playsinline muted loop></video><canvas id="clipCanvas"></canvas></div></div>
+        <div class="cp-pane"><div class="cp-tag good">Verdict</div>
+          <div class="cp-video demo clean"><div class="cp-clean">✓<span>Clean form — no corrections needed. Your reps match the model.</span></div></div></div>
+      </div>
+    </div>`;
+  }
+  return `<div class="cine-player">
+    <div class="cp-stage">
+      <div class="cp-pane">
+        <div class="cp-tag">Your form <span class="cp-sub">what happened</span></div>
+        <div class="cp-video"><video id="playClip" playsinline muted loop></video><canvas id="clipCanvas"></canvas>
+          <div class="cp-flag" id="clipFlag">MISTAKE</div></div>
+      </div>
+      <div class="cp-pane">
+        <div class="cp-tag good">Correct form <span class="cp-sub">the fix</span></div>
+        <div class="cp-video demo"><canvas id="demoCanvas"></canvas></div>
+      </div>
+    </div>
+    <div class="cp-fault" id="faultCard"></div>
+    <div class="cp-timeline" id="timeline" aria-label="Fault timeline"></div>
+    <div class="cp-controls">
+      <button type="button" class="coach-btn small" id="cpPlay">Pause</button>
+      <button type="button" class="coach-btn small" id="cpPrev">◀ Prev</button>
+      <button type="button" class="coach-btn small" id="cpNext">Next ▶</button>
+      <span class="cp-hint">Tap a marker to jump to that mistake</span>
+    </div>
+  </div>`;
+}
+
+// Wires video, overlay canvas, correction demo and timeline. Returns a cleanup fn.
+export function wirePlayer(root, r, objUrl){
+  const video = root.querySelector("#playClip");
+  if(!video) return () => {};
+  video.src = objUrl;
+  const clipCanvas = root.querySelector("#clipCanvas");
+  const demoCanvas = root.querySelector("#demoCanvas");
+  const clipFlag = root.querySelector("#clipFlag");
+  const faultCard = root.querySelector("#faultCard");
+  const timeline = root.querySelector("#timeline");
+  const faults = r.faults, dur = r.durationSec || 1;
+  const provider = getDemoProvider("computed");
+  let raf = 0, activeIdx = -1, renderer = null, dead = false;
+
+  function fitClip(){
+    if(!video.videoWidth) return;
+    const ar = (video.videoWidth / video.videoHeight).toFixed(4);
+    const pane = clipCanvas.parentElement;
+    pane.style.aspectRatio = ar;
+    clipCanvas.width = pane.clientWidth; clipCanvas.height = pane.clientHeight;
+    if(demoCanvas){ demoCanvas.parentElement.style.aspectRatio = ar;
+      demoCanvas.width = demoCanvas.clientWidth; demoCanvas.height = demoCanvas.clientHeight; }
+  }
+  video.addEventListener("loadedmetadata", fitClip);
+  const onResize = () => fitClip();
+  window.addEventListener("resize", onResize);
+
+  function setActive(i){
+    if(!faults.length) return;
+    activeIdx = (i + faults.length) % faults.length;
+    const f = faults[activeIdx];
+    renderer = provider.prepare(f);
+    const d = describeFocus(f.focus, f.target, f.lm);
+    if(faultCard) faultCard.innerHTML =
+      `<div class="fc-l"><span class="fc-k">Mistake · rep ${f.rep}</span>${f.msg}</div>
+       <div class="fc-r"><span class="fc-k good">The fix</span>${d.verb}${d.detail ? ` · <b>${d.detail}</b>` : ""}</div>`;
+    if(timeline) timeline.querySelectorAll(".tl-mark").forEach((m, j) => m.classList.toggle("on", j === activeIdx));
+  }
+
+  // build timeline markers
+  if(timeline){
+    timeline.innerHTML = `<div class="tl-track"></div>` +
+      faults.map((f, i) => `<button type="button" class="tl-mark" data-i="${i}" style="left:${Math.max(1, Math.min(99, f.t/dur*100)).toFixed(1)}%" title="Rep ${f.rep}: ${f.msg.replace(/"/g,"&quot;")}"><b>${f.rep}</b></button>`).join("");
+    timeline.querySelectorAll(".tl-mark").forEach(m => m.addEventListener("click", () => {
+      const i = +m.dataset.i; setActive(i); try{ video.currentTime = Math.max(0, faults[i].t - 0.2); }catch(e){} video.play().catch(()=>{});
+    }));
+  }
+
+  const play = root.querySelector("#cpPlay"), prev = root.querySelector("#cpPrev"), next = root.querySelector("#cpNext");
+  if(play) play.addEventListener("click", () => { if(video.paused){ video.play(); play.textContent = "Pause"; } else { video.pause(); play.textContent = "Play"; } });
+  if(prev) prev.addEventListener("click", () => { setActive(activeIdx - 1); try{ video.currentTime = Math.max(0, faults[activeIdx].t - 0.2); }catch(e){} });
+  if(next) next.addEventListener("click", () => { setActive(activeIdx + 1); try{ video.currentTime = Math.max(0, faults[activeIdx].t - 0.2); }catch(e){} });
+
+  const nearestTrack = ct => {
+    const tr = r.track; if(!tr.length) return null;
+    let best = tr[0], bd = Infinity;
+    for(const e of tr){ const d = Math.abs(e.t - ct); if(d < bd){ bd = d; best = e; } }
+    return bd < 0.25 ? best : null;
+  };
+
+  function loop(){
+    if(dead) return;
+    const ct = video.currentTime || 0;
+    // left: synced skeleton on the clip, highlight the active fault chain near its moment
+    if(clipCanvas.width){
+      const ctx = clipCanvas.getContext("2d");
+      ctx.clearRect(0, 0, clipCanvas.width, clipCanvas.height);
+      const e = nearestTrack(ct);
+      const f = faults[activeIdx];
+      const nearFault = f && Math.abs(ct - f.t) < 0.7;
+      if(e) drawPose(ctx, clipCanvas.width, clipCanvas.height, e.lm,
+        { mode:"overlay", base:"rgba(150,170,210,.55)", hi:"#ff5a5a", highlight: nearFault ? (FOCUS[f.focus]?.pairs || []) : [] });
+      if(clipFlag) clipFlag.classList.toggle("show", !!nearFault);
+    }
+    // auto-select the fault we're currently passing
+    for(let i = 0; i < faults.length; i++){ if(Math.abs(ct - faults[i].t) < 0.35 && i !== activeIdx){ setActive(i); break; } }
+    // right: correction demo morph loop (dwells on the corrected pose)
+    if(renderer && renderer.kind === "canvas" && demoCanvas && demoCanvas.width){
+      const cyc = (performance.now() % 2400) / 2400;
+      const ss = x => x*x*(3 - 2*x);
+      const p = cyc < 0.35 ? ss(cyc/0.35) : cyc < 0.78 ? 1 : 1 - ss((cyc - 0.78)/0.22);
+      renderer.draw(demoCanvas.getContext("2d"), demoCanvas.width, demoCanvas.height, p);
+    }
+    raf = requestAnimationFrame(loop);
+  }
+
+  video.addEventListener("loadeddata", () => { fitClip(); setActive(0); video.play().catch(()=>{}); });
+  raf = requestAnimationFrame(loop);
+
+  return () => { dead = true; if(raf) cancelAnimationFrame(raf); window.removeEventListener("resize", onResize); try{ video.pause(); video.src = ""; }catch(e){} };
+}
+
 const pickMime = () => ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"]
   .find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
 
@@ -147,6 +285,7 @@ export function renderResults(app, ctx){
       <div class="exercise-picker" id="exPicker"><div class="picker-row">${
         ids.map(id => `<button type="button" data-ex="${id}" class="${id===current?"active":""}">${EXERCISES[id].label}</button>`).join("")
       }</div></div>
+      <p class="film-tip" id="filmTip"><span>📹 Filming tip</span>${FILMING_TIPS[current] || ""}</p>
 
       <div class="stage results-stage" id="rStage">
         <video id="rVideo" playsinline muted></video>
@@ -172,9 +311,9 @@ export function renderResults(app, ctx){
   const $ = id => app.querySelector(id);
   const els = { video:$("#rVideo"), empty:$("#rEmpty"), badge:$("#rBadge"), badgeText:$("#rBadgeText"),
     state:$("#resState"), out:$("#rOutput"), upload:$("#btnUpload"), record:$("#btnRecord"),
-    stop:$("#btnStop"), file:$("#fileInput"), progWrap:$("#progWrap"), progBar:$("#progBar") };
+    stop:$("#btnStop"), file:$("#fileInput"), progWrap:$("#progWrap"), progBar:$("#progBar"), filmTip:$("#filmTip") };
 
-  let objUrl = null, recStream = null, recorder = null, recChunks = [], recTimer = null, busy = false;
+  let objUrl = null, recStream = null, recorder = null, recChunks = [], recTimer = null, busy = false, playerCleanup = null;
 
   function setState(t){ els.state.textContent = t; }
   function clearObjUrl(){ if(objUrl){ URL.revokeObjectURL(objUrl); objUrl = null; } }
@@ -182,6 +321,7 @@ export function renderResults(app, ctx){
   app.querySelectorAll("#exPicker button").forEach(b => b.addEventListener("click", () => {
     current = b.dataset.ex;
     app.querySelectorAll("#exPicker button").forEach(x => x.classList.toggle("active", x === b));
+    if(els.filmTip) els.filmTip.innerHTML = `<span>📹 Filming tip</span>${FILMING_TIPS[current] || ""}`;
     setState(`${EXERCISES[current].label} selected`);
   }));
 
@@ -194,11 +334,14 @@ export function renderResults(app, ctx){
     els.out.innerHTML = `<div class="empty-state">Analysing your ${EXERCISES[current].label.toLowerCase()} clip… this runs frame-by-frame on your device.</div>`;
     try{
       const r = await analyzeVideoFile(fileOrBlob, current, p => { els.progBar.style.width = Math.round(p*100) + "%"; });
+      if(playerCleanup){ playerCleanup(); playerCleanup = null; }
       clearObjUrl(); objUrl = r.videoUrl;
-      els.empty.style.display = "none";
-      els.video.srcObject = null; els.video.src = objUrl; els.video.loop = true; els.video.controls = true;
-      els.video.play().catch(()=>{});
-      els.out.innerHTML = cineOutput(r);
+      // input panel returns to a done state; the clip now lives in the player
+      els.video.src = ""; els.video.srcObject = null; els.video.controls = false; els.video.style.transform = "none";
+      els.empty.style.display = "";
+      els.empty.innerHTML = `<b>Clip analysed ✓</b>Your correction report is on the right. Add another clip anytime.`;
+      els.out.innerHTML = playerHTML(r) + cineOutput(r);
+      playerCleanup = wirePlayer(els.out, r, objUrl);
       setState(r.reps ? `${r.good}/${r.reps} clean` : "No reps detected");
     }catch(err){
       console.error(err);
@@ -263,6 +406,7 @@ export function renderResults(app, ctx){
     try{ if(recorder && recorder.state === "recording") recorder.stop(); }catch(e){}
     stopStream();
     if(recTimer) clearInterval(recTimer);
+    if(playerCleanup){ playerCleanup(); playerCleanup = null; }
     clearObjUrl();
   };
 }

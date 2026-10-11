@@ -338,6 +338,41 @@ input[type="range"]{padding:0;accent-color:var(--lime);height:32px;background:tr
 .rd.g{background:rgba(198,255,79,.15);border-color:rgba(198,255,79,.5);color:var(--lime)}
 .rd.w{background:rgba(245,215,110,.14);border-color:rgba(245,215,110,.45);color:var(--yellow)}
 
+/* Filming tip (input panel) */
+.film-tip{font-size:12.5px;line-height:1.4;color:#c7c9d2;background:rgba(92,140,255,.08);border:1px solid rgba(92,140,255,.28);border-radius:12px;padding:10px 12px;margin:0 0 14px}
+.film-tip span{display:inline-block;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-right:8px}
+
+/* Mistake-vs-correct player */
+.cine-player{border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px;
+  background:linear-gradient(180deg, rgba(10,11,15,.92), rgba(5,6,9,.96));box-shadow:var(--shadow);animation:rise .4s ease both}
+.cp-stage{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cp-pane{min-width:0}
+.cp-tag{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#ff8f8f;margin:0 0 7px;display:flex;align-items:baseline;gap:8px}
+.cp-tag.good{color:var(--green)}
+.cp-tag .cp-sub{color:var(--muted);letter-spacing:.02em}
+.cp-video{position:relative;border-radius:14px;overflow:hidden;background:#05060a;aspect-ratio:3/4;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.cp-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cp-video canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cp-video.demo{background:radial-gradient(120% 120% at 50% 0%, rgba(198,255,79,.08), transparent 60%),#05060a}
+.cp-flag{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;opacity:0;transition:.15s;box-shadow:0 0 14px rgba(255,107,107,.7)}
+.cp-flag.show{opacity:1}
+.cp-clean{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--green);font-size:46px;text-align:center;padding:20px}
+.cp-clean span{font-size:14px;color:#c7c9d2;max-width:28ch}
+.cp-fault{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 4px}
+.cp-fault>div{border-radius:12px;padding:11px 13px;font-size:13.5px;line-height:1.35;background:rgba(255,255,255,.03)}
+.cp-fault .fc-l{border-left:3px solid var(--red)}
+.cp-fault .fc-r{border-left:3px solid var(--green)}
+.cp-fault .fc-k{display:block;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#ff8f8f;margin-bottom:4px}
+.cp-fault .fc-k.good{color:var(--green)}
+.cp-fault .fc-r b{color:var(--lime)}
+.cp-timeline{position:relative;height:40px;margin:12px 4px 6px}
+.cp-timeline .tl-track{position:absolute;left:0;right:0;top:50%;height:3px;border-radius:2px;background:var(--line-strong);transform:translateY(-50%)}
+.tl-mark{position:absolute;top:50%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;border:1px solid var(--line-strong);background:var(--panel-2);color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+.tl-mark:hover{border-color:var(--ink);color:var(--ink)}
+.tl-mark.on{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 12px rgba(255,107,107,.7)}
+.cp-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.cp-hint{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+
 /* Responsive */
 @media (max-width: 980px){
   .topbar-inner{grid-template-columns:auto auto;justify-content:space-between}
@@ -359,4 +394,8 @@ input[type="range"]{padding:0;accent-color:var(--lime);height:32px;background:tr
   .field-grid{grid-template-columns:1fr}
   .cine-hero{grid-template-columns:1fr;justify-items:center;text-align:center}
   .cine-grid{grid-template-columns:1fr}
+  .cp-fault{grid-template-columns:1fr}
+}
+@media (max-width: 600px){
+  .cp-stage{grid-template-columns:1fr}
 }
