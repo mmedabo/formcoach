@@ -21,13 +21,13 @@ function angle(a, b, c){
   if(!mag) return null;
   return Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
 }
-const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
-function jointAngle(lm, j, indices){
+export const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
+export function jointAngle(lm, j, indices){
   const sides = [];
   for(const S of [L, R]) if(indices.every(k => visible(lm, S[k]))) sides.push(angle(lm[S[indices[0]]], lm[S[indices[1]]], lm[S[indices[2]]]));
   return sides.length ? sides.reduce((s,v)=>s+v,0)/sides.length : null;
 }
-function metrics(lm){
+export function metrics(lm){
   const g = i => lm[i] || {x:0, y:0}; const vis = i => visible(lm, i);
   const sL=g(11), sR=g(12), eL=g(13), eR=g(14), wL=g(15), wR=g(16), aL=g(27), aR=g(28), nose=g(0);
   const elbowL = (vis(11)&&vis(13)&&vis(15)) ? angle(sL,eL,wL) : null;
@@ -41,7 +41,7 @@ function metrics(lm){
 }
 
 // ---- Exercise library ----
-const EXERCISES = {
+export const EXERCISES = {
   spike: {
     type:"skill", label:"Spike (attack)", angleName:"Status", measure:lm => null,
     hint:"Approach, jump, and snap your hitting arm to full reach above your head. Keep your whole body in the frame.",
@@ -69,8 +69,8 @@ const EXERCISES = {
         const high = S.lastHigh, ext = S.lastExt;
         S.apexY = S.apexWristY = S.apexElbow = null;
         if(high && ext) return {good:true,  msg:"Strong spike — high contact above your head with a full arm reach!"};
-        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest."};
-        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow."};
+        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest.", focus:"reachHigh", target:null};
+        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow.", focus:"elbowExtend", target:170};
       }
       return null;
     }
@@ -91,7 +91,7 @@ const EXERCISES = {
       const extended = m.elbowL>150 && m.elbowR>150 && m.wL.y<m.noseY && m.wR.y<m.noseY;
       if(S.ready && extended && !S.counted){
         S.counted = true; S.ready = false;
-        if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set."};
+        if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set.", focus:"handsLevel", target:null};
         return {good:true, msg:"Clean set — high hands at the forehead and a full, even extension."};
       }
       if(S.counted && m.elbowL<120) S.counted = false;
@@ -120,9 +120,9 @@ const EXERCISES = {
     measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
     phases:[{name:"Stand tall", test:a=>a>=155},{name:"Descend with control", test:a=>a<155&&a>=110},{name:"Hit depth, then drive up", test:a=>a<110}],
     formCheck(lm, minAngle){
-      if(minAngle != null && minAngle > 105) return {type:"warn", msg:"Go a little deeper — aim for thighs near parallel."};
+      if(minAngle != null && minAngle > 105) return {type:"warn", msg:"Go a little deeper — aim for thighs near parallel.", focus:"kneeDepth", target:100};
       const torso = jointAngle(lm, "hip", ["shoulder","hip","knee"]);
-      if(torso != null && torso < 55) return {type:"warn", msg:"Chest is dropping — keep your torso taller."};
+      if(torso != null && torso < 55) return {type:"warn", msg:"Chest is dropping — keep your torso taller.", focus:"torsoUpright", target:75};
       return {type:"good", msg:"Clean squat — good depth and posture."};
     }
   },
@@ -132,8 +132,8 @@ const EXERCISES = {
     phases:[{name:"Top — arms extended", test:a=>a>=150},{name:"Lower your chest", test:a=>a<150&&a>=100},{name:"Reach bottom, then press", test:a=>a<100}],
     formCheck(lm, minAngle){
       const line = jointAngle(lm, "hip", ["shoulder","hip","ankle"]);
-      if(line != null && line < 155) return {type:"warn", msg:"Keep a straight line — don't let hips sag or pike."};
-      if(minAngle != null && minAngle > 100) return {type:"warn", msg:"Lower further — get elbows to about 90°."};
+      if(line != null && line < 155) return {type:"warn", msg:"Keep a straight line — don't let hips sag or pike.", focus:"bodyLine", target:175};
+      if(minAngle != null && minAngle > 100) return {type:"warn", msg:"Lower further — get elbows to about 90°.", focus:"elbowDepth", target:95};
       return {type:"good", msg:"Solid push-up — full range and a straight body."};
     }
   },
@@ -142,7 +142,7 @@ const EXERCISES = {
     measure:lm => jointAngle(lm, "knee", ["hip","knee","ankle"]),
     phases:[{name:"Stand tall", test:a=>a>=155},{name:"Step back and lower", test:a=>a<155&&a>=115},{name:"Front thigh parallel, drive up", test:a=>a<115}],
     formCheck(lm, minAngle){
-      if(minAngle != null && minAngle > 110) return {type:"warn", msg:"Sink lower — front thigh toward parallel."};
+      if(minAngle != null && minAngle > 110) return {type:"warn", msg:"Sink lower — front thigh toward parallel.", focus:"kneeDepth", target:105};
       return {type:"good", msg:"Nice lunge depth — controlled and balanced."};
     }
   },
@@ -151,7 +151,7 @@ const EXERCISES = {
     measure:lm => jointAngle(lm, "hip", ["shoulder","hip","knee"]),
     phases:[{name:"Hips down to start", test:a=>a<140},{name:"Drive hips up", test:a=>a>=140&&a<162},{name:"Squeeze glutes at top", test:a=>a>=162}],
     formCheck(lm, maxAngle){
-      if(maxAngle != null && maxAngle < 160) return {type:"warn", msg:"Extend further — squeeze hips to full lockout."};
+      if(maxAngle != null && maxAngle < 160) return {type:"warn", msg:"Extend further — squeeze hips to full lockout.", focus:"hipExtend", target:172};
       return {type:"good", msg:"Strong bridge — full hip extension at the top."};
     }
   }
@@ -333,6 +333,16 @@ async function ensureModel(){
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
     runningMode:"VIDEO", numPoses: (court && court.maxPlayers) || 4
+  });
+}
+// Single-person VIDEO landmarker for the offline Results analyzer (independent of
+// the live coach's multi-person model, which varies numPoses for Court Vision).
+export async function createLandmarker(){
+  if(!PoseLandmarker) ({ FilesetResolver, PoseLandmarker, DrawingUtils } = await import(MP_URL));
+  const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
+  return PoseLandmarker.createFromOptions(vision, {
+    baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
+    runningMode:"VIDEO", numPoses:1
   });
 }
 // pick the target pose: a locked target is re-acquired by nearest foot, else the largest (closest) person

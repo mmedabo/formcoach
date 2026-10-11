@@ -4,10 +4,11 @@ import { renderSports } from "./pages/sports.js";
 import { renderTrain } from "./pages/train.js";
 import { renderTrack } from "./pages/track.js";
 import { renderBuilder } from "./pages/builder.js";
+import { renderResults } from "./pages/results.js";
 
 const app = document.getElementById("app");
-const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder };
-const NAV = ["home", "sports", "train", "coach", "build", "track"];
+const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder, results: renderResults };
+const NAV = ["home", "sports", "train", "coach", "results", "build", "track"];
 
 // Camera-heavy pages are code-split and loaded on demand.
 const LAZY = {
