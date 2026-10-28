@@ -211,15 +211,20 @@ const volleyballCombined = {
 export const SPORTS = {
   volleyball: {
     id: "volleyball",
-    name: "Volleyball",
+    name: "Beach Volleyball",
     status: "active",
-    blurb: "Beach & indoor. Jump higher, move quicker, and sharpen spike / set / receive technique.",
+    blurb: "International beach volleyball. Jump higher, move quicker on sand, and sharpen spike / set / receive technique.",
     programs: [volleyballSpeed, volleyballStrength, volleyballCombined],
     coach: {
       skillsLabel: "Volleyball skills",
       skills: ["spike", "set", "receive"],
       workout: ["squat", "pushup", "lunge", "bridge"],
       defaultExercise: "receive",
+    },
+    court: {                    // Court Vision: real beach-volleyball court, metres
+      length: 16, width: 8, netAt: 8,   // net across the middle of the 16 m length
+      corners: ["near-left", "near-right", "far-right", "far-left"],
+      maxPlayers: 4,
     },
   },
   tennis:     { id: "tennis",     name: "Tennis",     status: "soon", blurb: "Serve power, footwork and rotational strength. Coming soon." },

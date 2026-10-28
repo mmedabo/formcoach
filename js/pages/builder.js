@@ -16,7 +16,7 @@ function harvest(sport){
 }
 function newBlock(title){ const i = blocks.length; return { id: "b" + (++seq), title: title || "Block " + (i+1), items: [], x: 15 + (i%3)*360, y: 15 + Math.floor(i/3)*300 }; }
 const nodeId = b => "blk_" + b.id;
-const wires = () => blocks.slice(1).map((b,i) => [nodeId(blocks[i]), nodeId(b), "#5c8cff"]);
+const wires = () => blocks.slice(1).map((b,i) => [nodeId(blocks[i]), nodeId(b), "#ff5c00"]);
 
 export function renderBuilder(app, { sport }){
   suggestions = harvest(sport);

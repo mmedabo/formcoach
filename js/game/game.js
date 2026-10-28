@@ -8,9 +8,9 @@
 // ============================================================================
 
 import { createPersonDetector } from "../coach/coach.js";
+import { PALETTE as COLORS } from "../court/mapping.js";
 import { homography, project, createTracker, onCourt, COURT_W, COURT_H, COURT_CORNERS } from "./track.js";
 
-const COLORS = ["#5c8cff", "#7cf5a0", "#f5d76e", "#ff8ad4"];
 const CORNER_NAMES = ["near-left", "near-right", "far-right", "far-left"];
 const RING_M = 0.6;                 // ring radius on the sand, metres
 
@@ -130,7 +130,7 @@ function nearest(people, pos){
 
 // ---- Drawing -----------------------------------------------------------------
 function drawTaps(ctx, s){
-  ctx.save(); ctx.fillStyle = "#c6ff4f"; ctx.strokeStyle = "#c6ff4f"; ctx.lineWidth = 2 * s;
+  ctx.save(); ctx.fillStyle = "#ff5c00"; ctx.strokeStyle = "#ff5c00"; ctx.lineWidth = 2 * s;
   ctx.font = `600 ${16 * s}px ui-monospace, monospace`;
   taps.forEach(([x, y], i) => {
     ctx.beginPath(); ctx.arc(x, y, 7 * s, 0, Math.PI * 2); ctx.fill();

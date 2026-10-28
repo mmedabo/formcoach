@@ -10,11 +10,18 @@ const app = document.getElementById("app");
 const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder, results: renderResults };
 const NAV = ["home", "sports", "train", "coach", "game", "results", "build", "track"];
 
+// Camera-heavy pages are code-split and loaded on demand.
+const LAZY = {
+  coach: { path: "./coach/coach.js", mount: "mountCoach", unmount: "unmountCoach", loading: "Loading Form Coach…" },
+  game:  { path: "./game/game.js",   mount: "mountGame",  unmount: "unmountGame",  loading: "Loading Game Tracker…" },
+};
+const lazyCache = {};
+
 const SPORT_KEY = "bv_active_sport";
 const currentSportId = () => localStorage.getItem(SPORT_KEY) || "volleyball";
 function setSport(id){ if(SPORTS[id] && SPORTS[id].status === "active"){ localStorage.setItem(SPORT_KEY, id); } }
 
-let coachMod = null, gameMod = null, pageTeardown = null;
+let pageTeardown = null;
 
 async function route(){
   const page = (location.hash.replace("#","").split("/")[0]) || "home";
@@ -26,31 +33,17 @@ async function route(){
 
   const ctx = { sport: getSport(currentSportId()), setSport };
 
-  if(known === "coach"){
+  if(LAZY[known]){
+    const cfg = LAZY[known];
     app.className = "page";
-    app.innerHTML = `<div class="empty-state">Loading Form Coach…</div>`;
+    app.innerHTML = `<div class="empty-state">${cfg.loading}</div>`;
     try{
-      if(!coachMod) coachMod = await import("./coach/coach.js");
-      coachMod.mountCoach(app, ctx.sport);
-      pageTeardown = () => coachMod.unmountCoach();
+      if(!lazyCache[known]) lazyCache[known] = await import(cfg.path);
+      lazyCache[known][cfg.mount](app, ctx.sport);
+      pageTeardown = () => lazyCache[known][cfg.unmount]();
     }catch(e){
       console.error(e);
-      app.innerHTML = `<div class="empty-state">Couldn't load the Form Coach module. Check your connection and retry.</div>`;
-    }
-    window.scrollTo({ top: 0 });
-    return;
-  }
-
-  if(known === "game"){
-    app.className = "page";
-    app.innerHTML = `<div class="empty-state">Loading Game Tracker…</div>`;
-    try{
-      if(!gameMod) gameMod = await import("./game/game.js");
-      gameMod.mountGame(app);
-      pageTeardown = () => gameMod.unmountGame();
-    }catch(e){
-      console.error(e);
-      app.innerHTML = `<div class="empty-state">Couldn't load the Game Tracker module. Check your connection and retry.</div>`;
+      app.innerHTML = `<div class="empty-state">Couldn't load this module. Check your connection and retry.</div>`;
     }
     window.scrollTo({ top: 0 });
     return;
@@ -71,3 +64,6 @@ function setActiveNav(page){
 window.addEventListener("hashchange", route);
 window.addEventListener("DOMContentLoaded", route);
 if(document.readyState !== "loading") route();
+
+// Network-first service worker → app always loads the latest when online (no more hard-refresh)
+if("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));

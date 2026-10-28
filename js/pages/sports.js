@@ -18,10 +18,11 @@ export function renderSports(app, { sport, setSport }){
 
 function sportCard(s, activeId){
   const soon = s.status !== "active";
+  const isActive = s.id === activeId;
   return `
-    <button class="sport-card ${s.id===activeId ? "active-sport":""}" data-sport="${s.id}" ${soon ? "disabled":""}>
+    <button class="sport-card ${isActive ? "active-sport":""}" data-sport="${s.id}" ${soon ? "disabled":""}>
       <span class="sport-status ${soon ? "soon":""}">${soon ? "Coming soon" : "Ready"}</span>
       <div><h3>${s.name}</h3><p>${s.blurb}</p></div>
-      ${s.id===activeId ? `<span class="sport-current"><span class="dot"></span> Active sport</span>` : (soon ? "" : `<span class="sport-current">Tap to select →</span>`)}
+      <span class="sport-current">${isActive ? `<span class="dot"></span> Active sport` : (soon ? "In training" : "Tap to select →")}</span>
     </button>`;
 }

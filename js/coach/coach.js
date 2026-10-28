@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { initNodeCanvas } from "../nodeCanvas.js";
+import { computeHomography, applyH, drawCourt } from "../court/mapping.js";
 
 const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 let FilesetResolver, PoseLandmarker, DrawingUtils;
@@ -162,63 +163,180 @@ let current = "receive", reps = 0, goodAttempts = 0, stage = "rest", extremeAngl
 let skillState = {}, sessionStart = null, trail = [], facing = "user";
 let attemptLog = [], lastAttemptId = null;
 let sportCoach = null, sportName = "", mode = "skills";
+let sportPrograms = null, workoutSource = "base", currentLabelOverride = null;
 const LOG_KEY = "bv_coach_log_v1";
-const TRAIL_NEUTRAL = "130,180,255", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
+const TRAIL_NEUTRAL = "255,122,47", TRAIL_GOOD = "150,230,80", TRAIL_WARN = "255,170,40";
 let trailColor = TRAIL_NEUTRAL, ghost = null;
 const HEAT_COLS = 44, HEAT_ROWS = 33;
 let heatGrid = new Float32Array(HEAT_COLS * HEAT_ROWS), heatMax = 0, heatOn = false;
+// court overlay + multi-player target + athlete
+let court = null, H = null, calibrating = false, calibPts = [], courtOn = true;
+let players = [], targetIdx = -1, targetLast = null, athleteName = "";
+let recSamples = [], recDist = 0, lastRecPos = null, lastSampleT = 0;
 
 const els = {};
 const ID = id => document.getElementById(id);
-function cache(){ ["coachVideo","coachCanvas","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+function cache(){ ["coachVideo","coachCanvas","coachStage","coachMini","cvMini","athleteName","calibrate","courtToggle","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+
+// Expand the camera preview to a full-screen overlay so users can watch their
+// own tracking, then minimize back to the normal node when they're done.
+let onKeyDown = null, stagePlaceholder = null;
+function setExpanded(on){
+  const stage = els.coachStage || ID("coachStage"); if(!stage) return;
+  const isOn = stage.classList.contains("expanded");
+  if(on && !isOn){
+    // portal the stage to <body> so position:fixed is viewport-relative even
+    // if an ancestor (page entrance animation, desktop node canvas) has a transform
+    stagePlaceholder = document.createComment("coach-stage");
+    stage.parentNode.insertBefore(stagePlaceholder, stage);
+    document.body.appendChild(stage);
+  } else if(!on && isOn && stagePlaceholder && stagePlaceholder.parentNode){
+    stagePlaceholder.parentNode.insertBefore(stage, stagePlaceholder);
+    stagePlaceholder.remove(); stagePlaceholder = null;
+  }
+  stage.classList.toggle("expanded", on);
+  document.body.classList.toggle("coach-fs", on);
+  if(els.expandCam) els.expandCam.classList.toggle("on", on);
+}
 
 function toast(msg){ const t = ID("toast"); if(!t) return; t.textContent = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2100); }
 function badge(text, live){ els.stageBadgeText.textContent = text; els.stageBadge.classList.toggle("live", !!live); }
 function setCue(type, msg){ if(msg === lastCue) return; lastCue = msg; els.formCue.className = `form-cue ${type}`; els.formCue.textContent = msg; }
+
+// ---- Training-plan ↔ Form-Coach bridge -------------------------------------
+// Map a free-text exercise name (from a program or a custom plan) onto one of
+// the movement patterns the pose coach can actually grade. Returns a detector
+// key (squat/pushup/lunge/bridge) or null when it isn't auto-trackable yet.
+function matchDetector(name){
+  const n = String(name || "").toLowerCase();
+  if(/push[\s-]?up/.test(n)) return "pushup";
+  if(/split squat|bulgarian|lunge/.test(n)) return "lunge";
+  if(/bridge|hip thrust/.test(n)) return "bridge";
+  if(/squat/.test(n)) return "squat";          // back squat, squat jumps, goblet…
+  return null;
+}
+const escHtml = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function readCustomPlans(){ try{ const a = JSON.parse(localStorage.getItem("bv_custom_plans")); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+const exLabel = () => currentLabelOverride || (EXERCISES[current] ? EXERCISES[current].label : "");
+
+// Exercises for the selected workout source, de-duplicated and matched.
+function workoutItems(){
+  let names = [];
+  if(workoutSource === "base"){
+    return (sportCoach.workout || []).filter(id => EXERCISES[id]).map(id => ({ name: EXERCISES[id].label, detector: id }));
+  }
+  const sep = workoutSource.indexOf(":"), kind = workoutSource.slice(0, sep), key = workoutSource.slice(sep + 1);
+  if(kind === "program"){
+    const p = (sportPrograms || []).find(x => x.id === key);
+    if(p && p.days) names = p.days.flatMap(d => (d.blocks || []).flatMap(b => b.items.map(i => i.name)));
+  } else if(kind === "plan"){
+    const p = readCustomPlans()[Number(key)];
+    if(p) names = (p.blocks || []).flatMap(b => (b.items || []).map(i => i.name));
+  }
+  const seen = new Set(), items = [];
+  names.forEach(n => { const k = n.toLowerCase(); if(k && !seen.has(k)){ seen.add(k); items.push({ name: n, detector: matchDetector(n) }); } });
+  return items;
+}
+function sourceOptions(){
+  let html = `<option value="base">Base movements</option>`;
+  (sportPrograms || []).forEach(p => { if(p.days) html += `<option value="program:${p.id}">Program · ${escHtml(p.name)}</option>`; });
+  readCustomPlans().forEach((p, i) => { html += `<option value="plan:${i}">My plan · ${escHtml(p.name)}</option>`; });
+  return html;
+}
 
 function setMode(m){
   mode = m;
   els.modeSkills.classList.toggle("active", m === "skills");
   els.modeWorkout.classList.toggle("active", m === "workout");
   buildPicker();
-  const ids = m === "skills" ? sportCoach.skills : sportCoach.workout;
-  if(ids.length) selectExercise(ids[0]);
+  if(m === "skills"){
+    const ids = (sportCoach.skills || []).filter(id => EXERCISES[id]);
+    if(ids.length) selectExercise(ids[0]);
+  } else {
+    const first = workoutItems().find(it => it.detector);
+    if(first) selectExercise(first.detector, first.name);
+  }
+}
+function chip(label, detector, active){
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label; b.dataset.label = label;
+  if(detector){
+    b.dataset.ex = detector;
+    b.className = active ? "active" : "";
+    b.addEventListener("click", () => selectExercise(detector, label));
+  } else {
+    b.disabled = true; b.className = "untracked"; b.title = "Pose tracking for this exercise isn't available yet";
+  }
+  return b;
 }
 function buildPicker(){
   els.exercisePicker.innerHTML = "";
-  const ids = (mode === "skills" ? sportCoach.skills : sportCoach.workout).filter(id => EXERCISES[id]);
-  const row = document.createElement("div"); row.className = "picker-row";
-  ids.forEach(id => {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = EXERCISES[id].label; b.dataset.ex = id;
-    b.className = id === current ? "active" : "";
-    b.addEventListener("click", () => selectExercise(id));
-    row.appendChild(b);
+  if(mode === "skills"){
+    const row = document.createElement("div"); row.className = "picker-row";
+    (sportCoach.skills || []).filter(id => EXERCISES[id]).forEach(id =>
+      row.appendChild(chip(EXERCISES[id].label, id, id === current)));
+    els.exercisePicker.appendChild(row);
+    return;
+  }
+  // Workout mode: choose a source (base movements / a program / a saved plan),
+  // then pick any of its exercises to track.
+  const sel = document.createElement("select");
+  sel.className = "plan-select wk-source"; sel.innerHTML = sourceOptions(); sel.value = workoutSource;
+  if(sel.value !== workoutSource){ workoutSource = "base"; sel.value = "base"; }   // plan was deleted
+  sel.addEventListener("change", () => {
+    workoutSource = sel.value; buildPicker();
+    const first = workoutItems().find(it => it.detector);
+    if(first) selectExercise(first.detector, first.name);
+    else setCue("info", "None of these are auto-trackable yet — the dimmed ones need pose logic. Pick a base movement to track now.");
   });
+  els.exercisePicker.appendChild(sel);
+
+  const items = workoutItems();
+  const row = document.createElement("div"); row.className = "picker-row";
+  items.forEach(it => row.appendChild(chip(it.name, it.detector, current === it.detector && exLabel() === it.name)));
   els.exercisePicker.appendChild(row);
+
+  if(workoutSource !== "base"){
+    const trackable = items.filter(it => it.detector).length;
+    const note = document.createElement("p"); note.className = "coach-note picker-note";
+    note.textContent = trackable
+      ? `${trackable} of ${items.length} exercise${items.length === 1 ? "" : "s"} can be tracked now — dimmed ones aren't pose-trackable yet.`
+      : "No exercises here are pose-trackable yet — switch to Base movements to track squats, push-ups, lunges or bridges.";
+    els.exercisePicker.appendChild(note);
+  }
 }
 function renderSteps(states){
   const ex = EXERCISES[current];
   const items = ex.type === "skill" ? ex.criteria : ex.phases;
   els.phaseTrack.innerHTML = items.map((it,i)=>`<li class="${states[i]?"active":""}"><span class="pip"></span>${it.name}</li>`).join("");
 }
-function selectExercise(id){
-  current = id;
+function selectExercise(id, labelOverride){
+  current = id; currentLabelOverride = labelOverride || null;
   reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
   trail = []; trailColor = TRAIL_NEUTRAL; ghost = null; heatGrid.fill(0); heatMax = 0;
-  const ex = EXERCISES[id];
-  els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex===id));
+  const ex = EXERCISES[id], label = exLabel();
+  els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex === id && b.dataset.label === label));
   els.repCount.textContent = "0";
   els.repLabel.textContent = ex.type === "skill" ? "Attempts" : "Reps";
   els.angleLabel.textContent = ex.angleName;
   els.angleVal.textContent = "—";
   renderSteps((ex.type === "skill" ? ex.criteria : ex.phases).map(()=>false));
-  const intro = ex.type === "skill" ? ex.hint : `Tracking ${ex.label.toLowerCase()}s — get into your start position.`;
-  setCue("info", running ? intro : `Selected ${ex.label}. Start the camera to begin.`);
+  const intro = ex.type === "skill" ? ex.hint : `Tracking ${label.toLowerCase()} — get into your start position.`;
+  setCue("info", running ? intro : `Selected ${label}. Start the camera to begin.`);
 }
 
-// Loads MediaPipe (once) and returns a fresh VIDEO-mode pose landmarker.
-// Shared by the live coach and the offline results analyzer.
+async function ensureModel(){
+  if(poseLandmarker) return;
+  badge("Loading model…", false);
+  if(!PoseLandmarker) ({ FilesetResolver, PoseLandmarker, DrawingUtils } = await import(MP_URL));
+  const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
+  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:"GPU" },
+    runningMode:"VIDEO", numPoses: (court && court.maxPlayers) || 4
+  });
+}
+// Single-person VIDEO landmarker for the offline Results analyzer (independent of
+// the live coach's multi-person model, which varies numPoses for Court Vision).
 export async function createLandmarker(){
   if(!PoseLandmarker) ({ FilesetResolver, PoseLandmarker, DrawingUtils } = await import(MP_URL));
   const vision = await FilesetResolver.forVisionTasks(MP_URL + "/wasm");
@@ -237,10 +355,11 @@ export async function createPersonDetector(){
     runningMode:"VIDEO", scoreThreshold:0.4, categoryAllowlist:["person"], maxResults:10
   });
 }
-async function ensureModel(){
-  if(poseLandmarker) return;
-  badge("Loading model…", false);
-  poseLandmarker = await createLandmarker();
+// pick the target pose: a locked target is re-acquired by nearest foot, else the largest (closest) person
+function pickTarget(ps){
+  if(!ps.length) return -1;
+  if(targetLast){ let bi=0, bd=Infinity; ps.forEach((p,i)=>{ const d=Math.hypot(p.foot.x-targetLast.x, p.foot.y-targetLast.y); if(d<bd){ bd=d; bi=i; } }); return bi; }
+  let bi=0, ba=-1; ps.forEach((p,i)=>{ if(p.area>ba){ ba=p.area; bi=i; } }); return bi;
 }
 async function startCamera(){
   try{
@@ -254,8 +373,8 @@ async function startCamera(){
     applyMirror();
     draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
     els.stageEmpty.style.display = "none";
-    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false;
-    running = true; sessionStart = Date.now();
+    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false; els.calibrate.disabled = false;
+    running = true; sessionStart = Date.now(); targetLast = null; players = []; updateMiniVis();
     badge("Live", true); selectExercise(current); loop();
   }catch(err){
     console.error("Camera/model error", err);
@@ -273,7 +392,8 @@ function stopCamera(){
     els.coachVideo.srcObject = null;
     const ctx = els.coachCanvas.getContext("2d"); ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
     els.stageEmpty.style.display = "";
-    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true;
+    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true; els.expandCam.disabled = true;
+    setExpanded(false); updateMiniVis();
     badge("Camera off", false);
   }
 }
@@ -290,20 +410,70 @@ async function flipCamera(){
     toast(facing === "user" ? "Front camera" : "Rear camera");
   }catch(e){ console.error(e); toast("Couldn't switch camera"); }
 }
+// ---- Court calibration + target selection (tap the stage) ----
+function updateMiniVis(){ if(els.cvMini) els.cvMini.style.display = (courtOn && H && running) ? "block" : "none"; }
+function startCalibration(){
+  if(!running){ toast("Start the camera first"); return; }
+  calibrating = true; calibPts = []; H = null; els.calibrate.classList.add("accent"); updateMiniVis();
+  setCue("info", "Tap the 4 court corners: near-left, near-right, far-right, far-left.");
+}
+function onStageTap(e){
+  if(e.target.closest("button")) return;      // ignore the minimize/expand buttons
+  if(!running) return;
+  const r = els.coachStage.getBoundingClientRect();
+  let nx = (e.clientX-r.left)/r.width, ny = (e.clientY-r.top)/r.height;
+  if(facing === "user") nx = 1 - nx;          // front camera is mirrored → convert tap to landmark space
+  if(calibrating){
+    calibPts.push({ x: Math.max(0,Math.min(1,nx)), y: Math.max(0,Math.min(1,ny)) });
+    if(calibPts.length === 4){
+      const dst = [ {x:0,y:0}, {x:court.length,y:0}, {x:court.length,y:court.width}, {x:0,y:court.width} ];
+      H = computeHomography(calibPts, dst); calibrating = false; els.calibrate.classList.remove("accent");
+      recSamples = []; recDist = 0; lastRecPos = null; updateMiniVis(); toast("Court calibrated");
+      setCue("good", "Court calibrated — your position now shows on the mini court.");
+    } else { const nc = court.corners[calibPts.length] || "corner"; setCue("info", `Calibrating: tap the ${nc} corner (${calibPts.length+1}/4).`); }
+    return;
+  }
+  if(!players.length) return;                 // otherwise: pick nearest player as the coached target
+  let best = -1, bd = Infinity;
+  players.forEach((p,i)=>{ const cx=(p.minX+p.maxX)/2, cy=(p.minY+p.maxY)/2; const d=Math.hypot(cx-nx, cy-ny); if(d<bd){ bd=d; best=i; } });
+  if(best >= 0 && bd < 0.3){ targetLast = players[best].foot; skillState = {}; toast(`Targeting ${athleteName || ("player "+(best+1))}`); }
+}
 function loop(){
   if(!running) return;
   const v = els.coachVideo;
   if(v.readyState >= 2){
     const res = poseLandmarker.detectForVideo(v, performance.now());
     const ctx = els.coachCanvas.getContext("2d");
-    ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
+    const W = els.coachCanvas.width, Ht = els.coachCanvas.height;
+    ctx.clearRect(0,0,W,Ht);
     if(res.landmarks && res.landmarks.length){
-      const lm = res.landmarks[0];
-      updateTrail(lm); drawHeatmap(ctx); drawGhost(ctx); drawTrail(ctx);
-      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(33,84,255,.85)", lineWidth:3});
-      draw.drawLandmarks(lm, {color:"#caff35", lineWidth:1, radius:4});
-      processPose(lm);
-    } else setCue("info", "Step back so your whole body is in the frame.");
+      players = res.landmarks.map(lm => {
+        const xs=lm.map(p=>p.x), ys=lm.map(p=>p.y);
+        const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+        const la=lm[27], ra=lm[28];
+        return { lm, minX,maxX,minY,maxY, area:(maxX-minX)*(maxY-minY), foot:{x:(la.x+ra.x)/2, y:Math.max(la.y,ra.y)} };
+      });
+      targetIdx = pickTarget(players);
+      const tp = players[targetIdx];
+      targetLast = tp.foot;
+      // non-target players: dim boxes
+      players.forEach((p,i)=>{ if(i===targetIdx) return;
+        ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=2; ctx.strokeRect(p.minX*W,p.minY*Ht,(p.maxX-p.minX)*W,(p.maxY-p.minY)*Ht);
+        ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(p.minX*W,p.minY*Ht-18,22,18);
+        ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.textAlign="left"; ctx.fillText(i+1, p.minX*W+5, p.minY*Ht-5);
+      });
+      // target: trail + skeleton + grading
+      updateTrail(tp.lm); drawHeatmap(ctx); drawGhost(ctx); drawTrail(ctx);
+      draw.drawConnectors(tp.lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(255,92,0,.9)", lineWidth:3});
+      draw.drawLandmarks(tp.lm, {color:"#f5f5f0", lineWidth:1, radius:4});
+      if(players.length > 1 && athleteName){ ctx.fillStyle="#ff5c00"; ctx.fillRect(tp.minX*W, tp.minY*Ht-20, athleteName.length*8+12, 20); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText(athleteName, tp.minX*W+6, tp.minY*Ht-6); }
+      processPose(tp.lm);
+      // calibration corner markers
+      calibPts.forEach((p,i)=>{ ctx.fillStyle="#ff5c00"; ctx.beginPath(); ctx.arc(p.x*W,p.y*Ht,7,0,7); ctx.fill(); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText(i+1, p.x*W, p.y*Ht+4); });
+      // record the target's court path once the court is calibrated
+      if(H){ const now=performance.now(); if(now-lastSampleT>150){ lastSampleT=now; const pos=applyH(H,tp.foot.x,tp.foot.y); if(lastRecPos) recDist+=Math.hypot(pos.x-lastRecPos.x, pos.y-lastRecPos.y); lastRecPos=pos; recSamples.push({t:Math.round(now-(sessionStart||now)), x:+pos.x.toFixed(2), y:+pos.y.toFixed(2)}); if(recSamples.length>4000) recSamples.shift(); } }
+      if(courtOn && H && els.coachMini) drawCourt(els.coachMini, court, H, players, {tIdx:targetIdx, tName:athleteName, trail:recSamples});
+    } else { players=[]; setCue("info", "Step back so your whole body is in the frame."); if(courtOn && H && els.coachMini) drawCourt(els.coachMini, court, H, [], {tName:athleteName}); }
   }
   rafId = requestAnimationFrame(loop);
 }
@@ -332,7 +502,7 @@ function countRep(ex, extreme){
   const v = ex.formCheck(currentLm, extreme);
   onAttempt(v.type === "good");
   setCue(v.type, `Rep ${reps}: ${v.msg}`);
-  logAttempt({ exercise:current, label:ex.label, kind:"rep", reps, good:v.type==="good", msg:v.msg, metrics:{ extreme:rnd(extreme), measure:rnd(ex.measure(currentLm)) } });
+  logAttempt({ exercise:current, label:exLabel(), kind:"rep", reps, good:v.type==="good", msg:v.msg, metrics:{ extreme:rnd(extreme), measure:rnd(ex.measure(currentLm)) } });
   if(navigator.vibrate) navigator.vibrate(30);
 }
 function processSkill(lm, ex){
@@ -346,8 +516,8 @@ function processSkill(lm, ex){
     reps++; els.repCount.textContent = reps;
     if(verdict.good) goodAttempts++;
     onAttempt(verdict.good);
-    setCue(verdict.good ? "good" : "warn", `${ex.label} ${reps}: ${verdict.msg}`);
-    logAttempt({ exercise:current, label:ex.label, kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
+    setCue(verdict.good ? "good" : "warn", `${exLabel()} ${reps}: ${verdict.msg}`);
+    logAttempt({ exercise:current, label:exLabel(), kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
     if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
   } else if(reps === 0){
     const allMet = results.every(Boolean);
@@ -407,7 +577,7 @@ function drawTrail(ctx){
   ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(13,13,13,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
   if(current === "spike"){
     let peak = trail[0]; for(const p of trail) if(p.y < peak.y) peak = p;
-    ctx.strokeStyle = "rgba(33,84,255,.95)"; ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255,92,0,.95)"; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(peak.x, peak.y, 20, 0, Math.PI*2); ctx.stroke();
   }
   ctx.restore();
@@ -418,10 +588,12 @@ function saveSession(){
   try{ state = JSON.parse(localStorage.getItem(key)) || {}; }catch(e){ state = {}; }
   if(typeof state !== "object" || !state) state = {};
   if(!Array.isArray(state.coachSessions)) state.coachSessions = [];
-  const ex = EXERCISES[current], isSkill = ex.type === "skill";
-  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), sport:sportName, exercise:ex.label, kind:ex.type, reps,
-    goodReps: isSkill ? goodAttempts : null, durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null, savedAt:new Date().toISOString() });
-  const summary = isSkill ? `${goodAttempts}/${reps} clean ${ex.label.toLowerCase()}s` : `${reps} ${ex.label.toLowerCase()} reps`;
+  const ex = EXERCISES[current], isSkill = ex.type === "skill", label = exLabel();
+  state.coachSessions.push({ date:new Date().toISOString().slice(0,10), athlete: athleteName || null, sport:sportName, exercise:label, kind:ex.type, reps,
+    goodReps: isSkill ? goodAttempts : null, durationSec: sessionStart ? Math.round((Date.now()-sessionStart)/1000) : null,
+    courtDistanceM: H ? +recDist.toFixed(1) : null, courtSamples: H ? recSamples.length : 0, savedAt:new Date().toISOString() });
+  const who = athleteName ? `${athleteName}: ` : "";
+  const summary = isSkill ? `${who}${goodAttempts}/${reps} clean ${label.toLowerCase()}s` : `${who}${reps} ${label.toLowerCase()} reps`;
   try{ localStorage.setItem(key, JSON.stringify(state)); toast(`Saved ${summary}`); }catch(e){ toast("Save failed — storage may be full"); }
 }
 
@@ -515,18 +687,24 @@ function coachHTML(sport){
       <div class="stage" id="coachStage">
         <video id="coachVideo" playsinline muted></video>
         <canvas id="coachCanvas"></canvas>
+        <div class="court-mini" id="cvMini" style="display:none"><span class="court-mini-label">Live court</span><canvas id="coachMini" width="420" height="210"></canvas></div>
         <div class="stage-badge" id="stageBadge"><span class="dot"></span><span id="stageBadgeText">Camera off</span></div>
+        <button type="button" class="stage-expand-exit" id="minimizeCam" aria-label="Exit full screen">⤡ Minimize</button>
         <div class="stage-empty" id="stageEmpty"><b>Step into frame</b>Pick a movement, then start the camera. Stand 2–3 m back so your whole body is visible and the area is well lit.</div>
       </div>
+      <div class="cv-athlete"><input id="athleteName" class="cv-name" placeholder="Athlete name — then tap them in the frame" autocomplete="off" /></div>
       <div class="coach-controls">
         <button type="button" class="coach-btn primary" id="startCam">Start camera</button>
         <button type="button" class="coach-btn" id="stopCam" disabled>Stop</button>
+        <button type="button" class="coach-btn" id="expandCam" disabled>⤢ Full screen</button>
+        <button type="button" class="coach-btn" id="calibrate" disabled>Calibrate court</button>
+        <button type="button" class="coach-btn" id="courtToggle">Court: on</button>
         <button type="button" class="coach-btn" id="flipCam" disabled>Flip cam</button>
         <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
         <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
         <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
       </div>
-      <p class="coach-note">Tip: skills like spike/set read best from the side or front-on; prop your phone and use <b>Flip cam</b> for a full-body rear view. Want a scored report? <a href="#results" class="home-node-link" style="display:inline-flex">Analyse a clip in Results →</a></p>
+      <p class="coach-note">Tip: multiple people? Type a name and <b>tap the athlete</b> to coach them. Tap <b>Calibrate court</b> then the 4 corners to plot position on the mini court overlay.</p>
     </div>
     <div class="node" id="nodeCoach" data-x="300" data-y="14" data-w="310">
       <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
@@ -564,20 +742,32 @@ function coachHTML(sport){
   <p class="coach-note canvas-hint">Drag any node by its header to rearrange the canvas · wires follow.</p>`;
 }
 
-const WIRES = [["nodeMove","nodeCoach","#7cf5a0"], ["nodeCoach","nodePreview","#5c8cff"], ["nodeCoach","nodeData","#ff8ad4"]];
+const WIRES = [["nodeMove","nodeCoach","#ff5c00"], ["nodeCoach","nodePreview","#ff7a2f"], ["nodeCoach","nodeData","#666666"]];
 let canvasCtl = null;
 
 export function mountCoach(container, sport){
   container.innerHTML = coachHTML(sport);
   container.classList.add("page");
-  sportCoach = sport.coach; sportName = sport.name;
+  sportCoach = sport.coach; sportName = sport.name; sportPrograms = sport.programs || [];
+  court = sport.court || { length:16, width:8, netAt:8, corners:["near-left","near-right","far-right","far-left"], maxPlayers:4 };
   cache();
-  running = false; mode = "skills"; facing = "user"; current = sportCoach.defaultExercise || sportCoach.skills[0];
+  running = false; mode = "skills"; facing = "user"; workoutSource = "base"; currentLabelOverride = null;
+  H = null; calibrating = false; calibPts = []; courtOn = true; players = []; targetIdx = -1; targetLast = null; recSamples = []; athleteName = "";
+  current = sportCoach.defaultExercise || sportCoach.skills[0];
   buildPicker(); selectExercise(current);
   loadLog(); renderDataStats();
   els.startCam.addEventListener("click", startCamera);
   els.stopCam.addEventListener("click", stopCamera);
+  els.expandCam.addEventListener("click", () => setExpanded(!els.coachStage.classList.contains("expanded")));
+  els.minimizeCam.addEventListener("click", () => setExpanded(false));
+  onKeyDown = e => { if(e.key === "Escape") setExpanded(false); };
+  document.addEventListener("keydown", onKeyDown);
   els.flipCam.addEventListener("click", flipCamera);
+  els.calibrate.addEventListener("click", startCalibration);
+  els.courtToggle.addEventListener("click", ()=>{ courtOn = !courtOn; els.courtToggle.textContent = courtOn ? "Court: on" : "Court: off"; updateMiniVis(); });
+  els.athleteName.addEventListener("input", ()=>{ athleteName = els.athleteName.value.trim(); });
+  els.coachStage.addEventListener("pointerdown", onStageTap);
+  updateMiniVis();
   els.modeSkills.addEventListener("click", ()=> setMode("skills"));
   els.modeWorkout.addEventListener("click", ()=> setMode("workout"));
   els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
@@ -597,6 +787,8 @@ export function mountCoach(container, sport){
   if(els.dataPanel) els.dataPanel.addEventListener("toggle", () => canvasCtl && canvasCtl.redraw());
 }
 export function unmountCoach(){
+  setExpanded(false);
+  if(onKeyDown){ document.removeEventListener("keydown", onKeyDown); onKeyDown = null; }
   stopCamera();
   if(canvasCtl){ canvasCtl.destroy(); canvasCtl = null; }
 }

@@ -70,7 +70,7 @@ function headline(r){
 function scoreRing(score){
   const pct = score == null ? 0 : score, C = 2 * Math.PI * 52;
   const off = C * (1 - pct / 100);
-  const col = score == null ? "var(--muted)" : score >= 70 ? "var(--lime)" : score >= 40 ? "var(--yellow)" : "var(--red)";
+  const col = score == null ? "var(--muted)" : score >= 70 ? "var(--good)" : score >= 40 ? "var(--warn)" : "#ff5a5a";
   return `<svg class="score-ring" viewBox="0 0 120 120">
     <circle class="sr-track" cx="60" cy="60" r="52"/>
     <circle class="sr-val" cx="60" cy="60" r="52" style="stroke:${col};stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off.toFixed(1)}"/>
