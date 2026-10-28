@@ -6,7 +6,7 @@
 //  Only the correction OUTPUT is restyled; input/page chrome keep the app look.
 // ============================================================================
 
-import { EXERCISES } from "../coach/coach.js";
+import { EXERCISES, takeRecordedClip } from "../coach/coach.js";
 import { analyzeVideoFile } from "../coach/analyze.js";
 import { getDemoProvider, describeFocus, drawPose, FOCUS } from "../coach/demo.js";
 
@@ -318,12 +318,13 @@ export function renderResults(app, ctx){
   function setState(t){ els.state.textContent = t; }
   function clearObjUrl(){ if(objUrl){ URL.revokeObjectURL(objUrl); objUrl = null; } }
 
-  app.querySelectorAll("#exPicker button").forEach(b => b.addEventListener("click", () => {
-    current = b.dataset.ex;
-    app.querySelectorAll("#exPicker button").forEach(x => x.classList.toggle("active", x === b));
+  function selectEx(id){
+    current = id;
+    app.querySelectorAll("#exPicker button").forEach(x => x.classList.toggle("active", x.dataset.ex === id));
     if(els.filmTip) els.filmTip.innerHTML = `<span>📹 Filming tip</span>${FILMING_TIPS[current] || ""}`;
     setState(`${EXERCISES[current].label} selected`);
-  }));
+  }
+  app.querySelectorAll("#exPicker button").forEach(b => b.addEventListener("click", () => selectEx(b.dataset.ex)));
 
   async function runAnalysis(fileOrBlob){
     if(busy) return;
@@ -400,6 +401,13 @@ export function renderResults(app, ctx){
     }
   });
   els.stop.addEventListener("click", () => { if(recorder && recorder.state === "recording") recorder.stop(); });
+
+  // A clip recorded in the Form Coach arrives here ready to analyse.
+  const handoff = takeRecordedClip();
+  if(handoff){
+    if(EXERCISES[handoff.exercise]) selectEx(handoff.exercise);
+    runAnalysis(handoff.blob);
+  }
 
   // teardown
   return () => {

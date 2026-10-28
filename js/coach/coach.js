@@ -176,7 +176,7 @@ let recSamples = [], recDist = 0, lastRecPos = null, lastSampleT = 0;
 
 const els = {};
 const ID = id => document.getElementById(id);
-function cache(){ ["coachVideo","coachCanvas","coachStage","coachMini","cvMini","athleteName","calibrate","courtToggle","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
+function cache(){ ["coachVideo","coachCanvas","coachStage","coachMini","cvMini","athleteName","calibrate","courtToggle","stageBadge","stageBadgeText","stageEmpty","startCam","stopCam","expandCam","minimizeCam","flipCam","resetReps","heatToggle","saveSession","recClip","toResults","modeSkills","modeWorkout","exercisePicker","repCount","repLabel","angleVal","angleLabel","formCue","phaseTrack","fbRight","fbWrong","fbMissed","dsTotal","dsGood","dsWrong","dsMissed","dataNote","addNote","exportCsv","exportJson","copyJson","clearLog"].forEach(id => els[id]=ID(id)); }
 
 // Expand the camera preview to a full-screen overlay so users can watch their
 // own tracking, then minimize back to the normal node when they're done.
@@ -373,7 +373,7 @@ async function startCamera(){
     applyMirror();
     draw = new DrawingUtils(els.coachCanvas.getContext("2d"));
     els.stageEmpty.style.display = "none";
-    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false; els.calibrate.disabled = false;
+    els.stopCam.disabled = false; els.flipCam.disabled = false; els.resetReps.disabled = false; els.saveSession.disabled = false; els.heatToggle.disabled = false; els.expandCam.disabled = false; els.calibrate.disabled = false; els.recClip.disabled = false;
     running = true; sessionStart = Date.now(); targetLast = null; players = []; updateMiniVis();
     badge("Live", true); selectExercise(current); loop();
   }catch(err){
@@ -385,6 +385,7 @@ async function startCamera(){
   }
 }
 function stopCamera(){
+  stopRec();
   running = false; trail = []; ghost = null; heatGrid.fill(0); heatMax = 0; trailColor = TRAIL_NEUTRAL;
   if(rafId) cancelAnimationFrame(rafId);
   if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
@@ -392,15 +393,55 @@ function stopCamera(){
     els.coachVideo.srcObject = null;
     const ctx = els.coachCanvas.getContext("2d"); ctx.clearRect(0,0,els.coachCanvas.width, els.coachCanvas.height);
     els.stageEmpty.style.display = "";
-    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true; els.expandCam.disabled = true;
+    els.startCam.disabled = false; els.stopCam.disabled = true; els.flipCam.disabled = true; els.expandCam.disabled = true; els.recClip.disabled = true;
     setExpanded(false); updateMiniVis();
     badge("Camera off", false);
   }
 }
+
+// ---- Record a clip of the live camera and hand it to Results ----
+const REC_MAX_S = 20;   // same cap as Results: longer clips analyse slowly
+const recMime = () => ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"]
+  .find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
+let recorder = null, recChunks = [], recTimer = null, lastClip = null, pendingClip = null;
+function startRec(){
+  if(!stream || !recMime()){ toast("Recording isn't supported in this browser"); return; }
+  const r = recorder = new MediaRecorder(stream, { mimeType: recMime() }), start = Date.now(), ex = current;
+  recChunks = [];
+  r.ondataavailable = e => { if(e.data && e.data.size) recChunks.push(e.data); };
+  r.onstop = () => {
+    const blob = new Blob(recChunks, { type: r.mimeType || "video/webm" });
+    if(!blob.size) return;
+    lastClip = { blob, exercise: ex };
+    if(els.toResults){ els.toResults.disabled = false; toast("Clip recorded — tap Analyse in Results"); }
+  };
+  r.start();
+  els.recClip.classList.add("on"); els.recClip.textContent = "■ Stop 0s";
+  recTimer = setInterval(() => {
+    const s = Math.round((Date.now() - start) / 1000);
+    els.recClip.textContent = `■ Stop ${s}s`;
+    if(s >= REC_MAX_S) stopRec();
+  }, 250);
+}
+function stopRec(){
+  if(!recorder) return;
+  clearInterval(recTimer); recTimer = null;
+  if(recorder.state === "recording") recorder.stop();
+  recorder = null;
+  if(els.recClip){ els.recClip.classList.remove("on"); els.recClip.textContent = "● Record"; }
+}
+function sendToResults(){
+  if(!lastClip) return;
+  pendingClip = lastClip; lastClip = null;
+  location.hash = "#results";
+}
+// Results calls this on mount to pick up a clip recorded here (same tab, in memory).
+export function takeRecordedClip(){ const c = pendingClip; pendingClip = null; return c; }
 function applyMirror(){ const t = facing === "user" ? "scaleX(-1)" : "none"; els.coachVideo.style.transform = t; els.coachCanvas.style.transform = t; }
 async function flipCamera(){
   facing = facing === "user" ? "environment" : "user";
   if(!running){ toast(facing === "user" ? "Front camera (start to use)" : "Rear camera (start to use)"); return; }
+  stopRec();   // the recorder is bound to the old camera stream
   try{
     if(stream) stream.getTracks().forEach(t => t.stop());
     stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:facing, width:{ideal:1280}, height:{ideal:960} }, audio:false });
@@ -703,8 +744,10 @@ function coachHTML(sport){
         <button type="button" class="coach-btn" id="resetReps" disabled>Reset reps</button>
         <button type="button" class="coach-btn" id="heatToggle" disabled>Heatmap</button>
         <button type="button" class="coach-btn accent" id="saveSession" disabled>Save session</button>
+        <button type="button" class="coach-btn" id="recClip" disabled>● Record</button>
+        <button type="button" class="coach-btn accent" id="toResults" disabled>Analyse in Results →</button>
       </div>
-      <p class="coach-note">Tip: multiple people? Type a name and <b>tap the athlete</b> to coach them. Tap <b>Calibrate court</b> then the 4 corners to plot position on the mini court overlay.</p>
+      <p class="coach-note">Tip: multiple people? Type a name and <b>tap the athlete</b> to coach them. Tap <b>Calibrate court</b> then the 4 corners to plot position on the mini court overlay. Want a scored report? Tap <b>● Record</b>, do 5–15 s of the movement, then <b>Analyse in Results</b>.</p>
     </div>
     <div class="node" id="nodeCoach" data-x="300" data-y="14" data-w="310">
       <div class="node-head"><span class="pd b"></span> Coach <span class="node-tag">grading</span></div>
@@ -773,6 +816,9 @@ export function mountCoach(container, sport){
   els.resetReps.addEventListener("click", ()=>{ reps=0; goodAttempts=0; stage="rest"; extremeAngle=null; skillState={}; trail=[]; ghost=null; heatGrid.fill(0); heatMax=0; trailColor=TRAIL_NEUTRAL; els.repCount.textContent="0"; setCue("info","Count reset — go again."); });
   els.heatToggle.addEventListener("click", ()=>{ heatOn = !heatOn; els.heatToggle.classList.toggle("accent", heatOn); els.heatToggle.textContent = heatOn ? "Heatmap: on" : "Heatmap"; });
   els.saveSession.addEventListener("click", saveSession);
+  lastClip = null;
+  els.recClip.addEventListener("click", () => recorder ? stopRec() : startRec());
+  els.toResults.addEventListener("click", sendToResults);
   els.fbRight.addEventListener("click", ()=> labelLast("correct"));
   els.fbWrong.addEventListener("click", ()=> labelLast("wrong"));
   els.fbMissed.addEventListener("click", ()=>{ logAttempt({ exercise:current, label:(EXERCISES[current]||{}).label||"—", kind:"missed", good:null, msg:"user: rep not counted", userLabel:"missed", metrics:{} }); toast("Logged a missed rep"); });
