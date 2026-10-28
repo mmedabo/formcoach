@@ -8,11 +8,12 @@ import { renderResults } from "./pages/results.js";
 
 const app = document.getElementById("app");
 const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder, results: renderResults };
-const NAV = ["home", "sports", "train", "coach", "results", "build", "track"];
+const NAV = ["home", "sports", "train", "coach", "game", "results", "build", "track"];
 
 // Camera-heavy pages are code-split and loaded on demand.
 const LAZY = {
   coach: { path: "./coach/coach.js", mount: "mountCoach", unmount: "unmountCoach", loading: "Loading Form Coach…" },
+  game:  { path: "./game/game.js",   mount: "mountGame",  unmount: "unmountGame",  loading: "Loading Game Tracker…" },
 };
 const lazyCache = {};
 

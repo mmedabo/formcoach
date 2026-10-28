@@ -6,7 +6,7 @@
 //  Only the correction OUTPUT is restyled; input/page chrome keep the app look.
 // ============================================================================
 
-import { EXERCISES } from "../coach/coach.js";
+import { EXERCISES, takeRecordedClip } from "../coach/coach.js";
 import { analyzeVideoFile } from "../coach/analyze.js";
 import { getDemoProvider, describeFocus, drawPose, FOCUS } from "../coach/demo.js";
 
@@ -296,6 +296,7 @@ export function renderResults(app, ctx){
       <div class="coach-controls">
         <button type="button" class="coach-btn primary" id="btnUpload">Upload clip</button>
         <button type="button" class="coach-btn" id="btnRecord" ${canRecord?"":"disabled title=\"Recording isn't supported in this browser — upload instead\""}>Record clip</button>
+        <button type="button" class="coach-btn" id="btnFacing" ${canRecord?"":"disabled"}>Cam: front</button>
         <button type="button" class="coach-btn accent" id="btnStop" style="display:none">Stop &amp; analyse</button>
       </div>
       <input type="file" id="fileInput" accept="video/*" hidden />
@@ -311,19 +312,21 @@ export function renderResults(app, ctx){
   const $ = id => app.querySelector(id);
   const els = { video:$("#rVideo"), empty:$("#rEmpty"), badge:$("#rBadge"), badgeText:$("#rBadgeText"),
     state:$("#resState"), out:$("#rOutput"), upload:$("#btnUpload"), record:$("#btnRecord"),
-    stop:$("#btnStop"), file:$("#fileInput"), progWrap:$("#progWrap"), progBar:$("#progBar"), filmTip:$("#filmTip") };
+    stop:$("#btnStop"), facing:$("#btnFacing"), file:$("#fileInput"), progWrap:$("#progWrap"), progBar:$("#progBar"), filmTip:$("#filmTip") };
 
   let objUrl = null, recStream = null, recorder = null, recChunks = [], recTimer = null, busy = false, playerCleanup = null;
+  let facing = "user";   // "user" = front (selfie) camera, "environment" = back camera
 
   function setState(t){ els.state.textContent = t; }
   function clearObjUrl(){ if(objUrl){ URL.revokeObjectURL(objUrl); objUrl = null; } }
 
-  app.querySelectorAll("#exPicker button").forEach(b => b.addEventListener("click", () => {
-    current = b.dataset.ex;
-    app.querySelectorAll("#exPicker button").forEach(x => x.classList.toggle("active", x === b));
+  function selectEx(id){
+    current = id;
+    app.querySelectorAll("#exPicker button").forEach(x => x.classList.toggle("active", x.dataset.ex === id));
     if(els.filmTip) els.filmTip.innerHTML = `<span>📹 Filming tip</span>${FILMING_TIPS[current] || ""}`;
     setState(`${EXERCISES[current].label} selected`);
-  }));
+  }
+  app.querySelectorAll("#exPicker button").forEach(b => b.addEventListener("click", () => selectEx(b.dataset.ex)));
 
   async function runAnalysis(fileOrBlob){
     if(busy) return;
@@ -365,15 +368,15 @@ export function renderResults(app, ctx){
   function stopStream(){ if(recStream){ recStream.getTracks().forEach(t => t.stop()); recStream = null; } }
   function endRecUi(){
     els.badge.style.display = "none"; els.stop.style.display = "none";
-    els.upload.style.display = ""; els.record.style.display = "";
+    els.upload.style.display = ""; els.record.style.display = ""; els.facing.style.display = "";
     if(recTimer){ clearInterval(recTimer); recTimer = null; }
   }
   els.record.addEventListener("click", async () => {
     if(busy) return;
     try{
-      recStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:960} }, audio:false });
+      recStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:facing, width:{ideal:1280}, height:{ideal:960} }, audio:false });
       els.video.src = ""; els.video.controls = false; els.video.loop = false;
-      els.video.srcObject = recStream; els.video.style.transform = "scaleX(-1)"; await els.video.play();
+      els.video.srcObject = recStream; els.video.style.transform = facing === "user" ? "scaleX(-1)" : "none"; await els.video.play();
       els.empty.style.display = "none";
       recChunks = [];
       recorder = new MediaRecorder(recStream, { mimeType: pickMime() });
@@ -386,7 +389,7 @@ export function renderResults(app, ctx){
       recorder.start();
       const start = Date.now();
       els.badge.style.display = ""; els.badgeText.textContent = "Recording 0s";
-      els.upload.style.display = "none"; els.record.style.display = "none"; els.stop.style.display = "";
+      els.upload.style.display = "none"; els.record.style.display = "none"; els.facing.style.display = "none"; els.stop.style.display = "";
       setState("Recording…");
       recTimer = setInterval(() => {
         const s = Math.round((Date.now()-start)/1000);
@@ -400,6 +403,17 @@ export function renderResults(app, ctx){
     }
   });
   els.stop.addEventListener("click", () => { if(recorder && recorder.state === "recording") recorder.stop(); });
+  els.facing.addEventListener("click", () => {
+    facing = facing === "user" ? "environment" : "user";
+    els.facing.textContent = facing === "user" ? "Cam: front" : "Cam: back";
+  });
+
+  // A clip recorded in the Form Coach arrives here ready to analyse.
+  const handoff = takeRecordedClip();
+  if(handoff){
+    if(EXERCISES[handoff.exercise]) selectEx(handoff.exercise);
+    runAnalysis(handoff.blob);
+  }
 
   // teardown
   return () => {

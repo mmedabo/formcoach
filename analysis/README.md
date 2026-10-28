@@ -36,6 +36,27 @@ python bv_tracker_v1.py clip.mp4
 Options: `--model <weights.pt>` to use fine-tuned ball weights,
 `--gap <seconds>` to tune how long a dead ball ends a rally.
 
+## Live overlay (prototype)
+
+The version for delivery is the **Game** screen in the web app (`#game`,
+`js/game/`). It runs on-device with MediaPipe (Apache-2.0). This script is an
+internal prototype: Ultralytics YOLO is AGPL-3.0, so do not ship it in a
+commercial product without an Ultralytics licence.
+
+```bash
+python bv_live.py 0                                  # webcam 0
+python bv_live.py http://<phone-ip>:8080/video       # phone stream
+python bv_live.py clip.mp4 --names Ana,Bo,Cy,Dee --out overlay.mp4
+```
+
+1. The first frame opens — **click the 4 court corners** (same order as above).
+2. A live window shows a ring under each player, a name tag, and a
+   court-map inset. Press `q` to quit.
+
+`--names` are given to players in the order the tracker first sees them.
+Players off the court (spectators, referee) are skipped. `--out` also
+records the overlay to an `.mp4`.
+
 ## Reliable ball detection (the one real gap)
 
 The pretrained COCO `sports ball` class misses the ball against bright sky,
@@ -53,5 +74,6 @@ python bv_tracker_v1.py clip.mp4 --model path/to/ball_weights.pt
 
 - `bv_tracker_v1.py` — main pass: calibrate → track players + ball → render
   heatmap, ball arc, and (via `segment_rallies`) per-rally overlays.
+- `bv_live.py` — live overlay: player rings, name tags, court map.
 - `segment_rallies.py` — splits the ball-point stream into rallies by gap size.
 - `extract_frames.py` — samples frames for building a ball-detection dataset.
