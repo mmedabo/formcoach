@@ -8,13 +8,13 @@ import { renderResults } from "./pages/results.js";
 
 const app = document.getElementById("app");
 const routes = { home: renderHome, sports: renderSports, train: renderTrain, track: renderTrack, build: renderBuilder, results: renderResults };
-const NAV = ["home", "sports", "train", "coach", "results", "build", "track"];
+const NAV = ["home", "sports", "train", "coach", "game", "results", "build", "track"];
 
 const SPORT_KEY = "bv_active_sport";
 const currentSportId = () => localStorage.getItem(SPORT_KEY) || "volleyball";
 function setSport(id){ if(SPORTS[id] && SPORTS[id].status === "active"){ localStorage.setItem(SPORT_KEY, id); } }
 
-let coachMod = null, pageTeardown = null;
+let coachMod = null, gameMod = null, pageTeardown = null;
 
 async function route(){
   const page = (location.hash.replace("#","").split("/")[0]) || "home";
@@ -36,6 +36,21 @@ async function route(){
     }catch(e){
       console.error(e);
       app.innerHTML = `<div class="empty-state">Couldn't load the Form Coach module. Check your connection and retry.</div>`;
+    }
+    window.scrollTo({ top: 0 });
+    return;
+  }
+
+  if(known === "game"){
+    app.className = "page";
+    app.innerHTML = `<div class="empty-state">Loading Game Tracker…</div>`;
+    try{
+      if(!gameMod) gameMod = await import("./game/game.js");
+      gameMod.mountGame(app);
+      pageTeardown = () => gameMod.unmountGame();
+    }catch(e){
+      console.error(e);
+      app.innerHTML = `<div class="empty-state">Couldn't load the Game Tracker module. Check your connection and retry.</div>`;
     }
     window.scrollTo({ top: 0 });
     return;

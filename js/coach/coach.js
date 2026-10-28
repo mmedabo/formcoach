@@ -227,6 +227,16 @@ export async function createLandmarker(){
     runningMode:"VIDEO", numPoses:1
   });
 }
+// VIDEO-mode person detector for the game tracker. The pose model misses small,
+// distant players on a full court; EfficientDet-Lite2 boxes find them.
+export async function createPersonDetector(){
+  const { FilesetResolver: FR, ObjectDetector } = await import(MP_URL);
+  const vision = await FR.forVisionTasks(MP_URL + "/wasm");
+  return ObjectDetector.createFromOptions(vision, {
+    baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite", delegate:"GPU" },
+    runningMode:"VIDEO", scoreThreshold:0.4, categoryAllowlist:["person"], maxResults:10
+  });
+}
 async function ensureModel(){
   if(poseLandmarker) return;
   badge("Loading model…", false);

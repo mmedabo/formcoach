@@ -373,8 +373,28 @@ input[type="range"]{padding:0;accent-color:var(--lime);height:32px;background:tr
 .cp-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
 .cp-hint{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 
+/* ===== Game Tracker ===== */
+.game-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:18px;align-items:start}
+.stage.game-stage{aspect-ratio:16/9}
+.game-stage video,.game-stage canvas{transform:none;object-fit:contain}
+.game-stage canvas{pointer-events:auto;cursor:crosshair}
+label.coach-btn{font:600 .88rem var(--sans);text-transform:none;letter-spacing:normal;color:var(--ink)}
+.game-names{display:grid;gap:6px;margin-top:14px;font:600 .66rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.game-names input{font:500 .9rem var(--sans);letter-spacing:0;text-transform:none}
+.game-map{display:block;width:100%;margin:8px 0 14px;border-radius:12px;background:rgba(92,140,255,.10);border:1px solid var(--line)}
+.game-players{display:grid;gap:10px}
+.game-player{border:1px solid var(--line);border-left:3px solid var(--pc);border-radius:14px;padding:10px 12px;background:var(--panel)}
+.game-player.lost{opacity:.45}
+.gp-top{display:flex;align-items:baseline;gap:8px}
+.gp-top b{flex:1;color:var(--pc);font-size:1rem}
+.gp-top strong{font-family:var(--display);font-size:1.6rem;line-height:1}
+.gp-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);margin:8px 0 6px;overflow:hidden}
+.gp-bar i{display:block;height:100%;background:var(--pc);border-radius:99px;transition:width .25s}
+.gp-foot{display:flex;justify-content:space-between}
+
 /* Responsive */
 @media (max-width: 980px){
+  .game-layout{grid-template-columns:1fr}
   .topbar-inner{grid-template-columns:auto auto;justify-content:space-between}
   .mini-nav{grid-column:1/-1;justify-content:flex-start;overflow:auto;padding-bottom:10px}
   .join-pill{display:none}

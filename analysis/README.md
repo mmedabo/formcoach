@@ -36,7 +36,12 @@ python bv_tracker_v1.py clip.mp4
 Options: `--model <weights.pt>` to use fine-tuned ball weights,
 `--gap <seconds>` to tune how long a dead ball ends a rally.
 
-## Live overlay
+## Live overlay (prototype)
+
+The version for delivery is the **Game** screen in the web app (`#game`,
+`js/game/`). It runs on-device with MediaPipe (Apache-2.0). This script is an
+internal prototype: Ultralytics YOLO is AGPL-3.0, so do not ship it in a
+commercial product without an Ultralytics licence.
 
 ```bash
 python bv_live.py 0                                  # webcam 0
