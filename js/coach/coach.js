@@ -8,36 +8,40 @@
 
 import { initNodeCanvas } from "../nodeCanvas.js";
 import { computeHomography, applyH, drawCourt } from "../court/mapping.js";
+import { angleAt, dist, jointAngleOf, torsoLen, legLen, shoulderWidth, createSmoother,
+  compareToReference, DEFAULT_REFERENCE, referenceFrom } from "./form.js";
 
 const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 let FilesetResolver, PoseLandmarker, DrawingUtils;
 
-const L = {shoulder:11, elbow:13, wrist:15, hip:23, knee:25, ankle:27};
-const R = {shoulder:12, elbow:14, wrist:16, hip:24, knee:26, ankle:28};
-
-function angle(a, b, c){
-  const ab = {x:a.x-b.x, y:a.y-b.y}, cb = {x:c.x-b.x, y:c.y-b.y};
-  const dot = ab.x*cb.x + ab.y*cb.y, mag = Math.hypot(ab.x, ab.y) * Math.hypot(cb.x, cb.y);
-  if(!mag) return null;
-  return Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
-}
+// Geometry lives in form.js and is aspect-correct: callers set lm.aspect = frame W/H.
 export const visible = (lm, i) => lm[i] && (lm[i].visibility ?? 1) > 0.5;
-export function jointAngle(lm, j, indices){
-  const sides = [];
-  for(const S of [L, R]) if(indices.every(k => visible(lm, S[k]))) sides.push(angle(lm[S[indices[0]]], lm[S[indices[1]]], lm[S[indices[2]]]));
-  return sides.length ? sides.reduce((s,v)=>s+v,0)/sides.length : null;
-}
+export function jointAngle(lm, j, indices){ return jointAngleOf(lm, indices); }
 export function metrics(lm){
   const g = i => lm[i] || {x:0, y:0}; const vis = i => visible(lm, i);
   const sL=g(11), sR=g(12), eL=g(13), eR=g(14), wL=g(15), wR=g(16), aL=g(27), aR=g(28), nose=g(0);
-  const elbowL = (vis(11)&&vis(13)&&vis(15)) ? angle(sL,eL,wL) : null;
-  const elbowR = (vis(12)&&vis(14)&&vis(16)) ? angle(sR,eR,wR) : null;
-  const shoulderY = (sL.y + sR.y)/2, shoulderW = Math.abs(sL.x - sR.x) || 0.001;
-  const wristGap = Math.hypot(wL.x-wR.x, wL.y-wR.y);
+  const elbowL = (vis(11)&&vis(13)&&vis(15)) ? angleAt(lm,11,13,15) : null;
+  const elbowR = (vis(12)&&vis(14)&&vis(16)) ? angleAt(lm,12,14,16) : null;
+  const shoulderY = (sL.y + sR.y)/2, shoulderW = shoulderWidth(lm) || 0.001;
+  const wristGap = dist(lm, 15, 16);
   let cnt=0, sum=0; if(vis(27)){sum+=aL.y;cnt++;} if(vis(28)){sum+=aR.y;cnt++;}
   const ankleY = cnt ? sum/cnt : null;
   return { lm, vis, sL, sR, eL, eR, wL, wR, aL, aR, nose, noseY:nose.y, elbowL, elbowR,
-    kneeAngle:jointAngle(lm,"knee",["hip","knee","ankle"]), shoulderY, shoulderW, wristGap, ankleY };
+    kneeAngle:jointAngle(lm,"knee",["hip","knee","ankle"]), shoulderY, shoulderW, wristGap, ankleY,
+    torso: torsoLen(lm), leg: legLen(lm) };   // body lengths, in frame-height units
+}
+
+// ---- Model rep (reference) per skill: coaching defaults, or a coach's own recorded rep ----
+const REF_KEY = "fc_reference_v1";
+function loadRefs(){ try{ return JSON.parse(localStorage.getItem(REF_KEY)) || {}; }catch(e){ return {}; } }
+export function getReference(exerciseId){
+  const own = loadRefs()[exerciseId];
+  return { ref: own ? referenceFrom(own, exerciseId) : (DEFAULT_REFERENCE[exerciseId] || null), custom: !!own };
+}
+export function saveReference(exerciseId, features){
+  const all = loadRefs();
+  if(features) all[exerciseId] = features; else delete all[exerciseId];
+  try{ localStorage.setItem(REF_KEY, JSON.stringify(all)); return true; }catch(e){ return false; }
 }
 
 // ---- Exercise library ----
@@ -53,24 +57,27 @@ export const EXERCISES = {
     ],
     detect(m, S){
       if(m.ankleY == null) return null;
+      if(m.leg) S.leg = S.leg ? S.leg*0.95 + m.leg*0.05 : m.leg;      // standing leg length, smoothed
       if(S.base == null) S.base = m.ankleY;
       if(!S.air) S.base = S.base*0.92 + m.ankleY*0.08;
-      const airborne = m.ankleY < S.base - 0.06;
+      const airborne = m.ankleY < S.base - 0.15 * (S.leg || 0.4);      // feet 0.15 leg-lengths off the ground
       if(airborne){
         S.air = true;
-        if(S.apexY == null || m.ankleY < S.apexY){
-          S.apexY = m.ankleY; S.apexWristY = Math.min(m.wL.y, m.wR.y);
-          S.apexNoseY = m.noseY; S.apexElbow = (m.wL.y < m.wR.y) ? m.elbowL : m.elbowR;
+        // contact = the highest wrist while airborne (the swing peaks after the jump peak)
+        const wristY = Math.min(m.wL.y, m.wR.y);
+        if(S.apexWristY == null || wristY < S.apexWristY){
+          S.apexWristY = wristY; S.apexNoseY = m.noseY; S.apexTorso = m.torso;
+          S.apexElbow = (m.wL.y < m.wR.y) ? m.elbowL : m.elbowR; S.apexLm = m.lm;
         }
       } else if(S.air){
         S.air = false; S.lastJump = true;
-        S.lastHigh = S.apexWristY != null && S.apexWristY < S.apexNoseY - 0.02;
+        S.lastHigh = S.apexWristY != null && S.apexWristY < S.apexNoseY - 0.1 * (S.apexTorso || 0.3);
         S.lastExt  = S.apexElbow != null && S.apexElbow > 150;
-        const high = S.lastHigh, ext = S.lastExt;
-        S.apexY = S.apexWristY = S.apexElbow = null;
-        if(high && ext) return {good:true,  msg:"Strong spike — high contact above your head with a full arm reach!"};
-        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest.", focus:"reachHigh", target:null};
-        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow.", focus:"elbowExtend", target:170};
+        const high = S.lastHigh, ext = S.lastExt, lm = S.apexLm;
+        S.apexWristY = S.apexElbow = S.apexLm = null;
+        if(high && ext) return {good:true,  msg:"Strong spike — high contact above your head with a full arm reach!", lm};
+        if(!high)       return {good:false, msg:"Reach higher — make contact above your head, not in front of your chest.", focus:"reachHigh", target:null, lm};
+        return {good:false, msg:"Extend your hitting arm fully at contact — snap to a straight elbow.", focus:"elbowExtend", target:170, lm};
       }
       return null;
     }
@@ -82,7 +89,7 @@ export const EXERCISES = {
     criteria:[
       {name:"Hands up at the forehead", test:m => m.wL.y<m.shoulderY && m.wR.y<m.shoulderY},
       {name:"Elbows bent ~90°, up & out", test:m => m.elbowL!=null&&m.elbowR!=null && m.elbowL>55&&m.elbowL<120 && m.elbowR>55&&m.elbowR<120},
-      {name:"Hands even (symmetric window)", test:m => Math.abs(m.wL.y-m.wR.y) < 0.07}
+      {name:"Hands even (symmetric window)", test:m => Math.abs(m.wL.y-m.wR.y) < 0.25 * (m.torso || 0.3)}
     ],
     detect(m, S){
       if(m.elbowL==null || m.elbowR==null) return null;
@@ -91,7 +98,7 @@ export const EXERCISES = {
       const extended = m.elbowL>150 && m.elbowR>150 && m.wL.y<m.noseY && m.wR.y<m.noseY;
       if(S.ready && extended && !S.counted){
         S.counted = true; S.ready = false;
-        if(Math.abs(m.wL.y - m.wR.y) > 0.08) return {good:false, msg:"Push evenly — keep both hands level through the set.", focus:"handsLevel", target:null};
+        if(Math.abs(m.wL.y - m.wR.y) > 0.3 * (m.torso || 0.3)) return {good:false, msg:"Push evenly — keep both hands level through the set.", focus:"handsLevel", target:null};
         return {good:true, msg:"Clean set — high hands at the forehead and a full, even extension."};
       }
       if(S.counted && m.elbowL<120) S.counted = false;
@@ -312,7 +319,7 @@ function renderSteps(states){
 }
 function selectExercise(id, labelOverride){
   current = id; currentLabelOverride = labelOverride || null;
-  reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {};
+  reps = 0; goodAttempts = 0; stage = "rest"; extremeAngle = null; skillState = {}; smoother.reset();
   trail = []; trailColor = TRAIL_NEUTRAL; ghost = null; heatGrid.fill(0); heatMax = 0;
   const ex = EXERCISES[id], label = exLabel();
   els.exercisePicker.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.ex === id && b.dataset.label === label));
@@ -345,15 +352,25 @@ export async function createLandmarker(){
     runningMode:"VIDEO", numPoses:1
   });
 }
-// VIDEO-mode person detector for the game tracker. The pose model misses small,
-// distant players on a full court; EfficientDet-Lite2 boxes find them.
-export async function createPersonDetector(){
+// VIDEO-mode object detectors for the game tracker.
+async function createObjectDetector(modelAssetPath, options){
   const { FilesetResolver: FR, ObjectDetector } = await import(MP_URL);
   const vision = await FR.forVisionTasks(MP_URL + "/wasm");
-  return ObjectDetector.createFromOptions(vision, {
-    baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite", delegate:"GPU" },
-    runningMode:"VIDEO", scoreThreshold:0.4, categoryAllowlist:["person"], maxResults:10
-  });
+  return ObjectDetector.createFromOptions(vision, { baseOptions:{ modelAssetPath, delegate:"GPU" }, runningMode:"VIDEO", ...options });
+}
+// People (and a generic COCO "sports ball"). The pose model misses small,
+// distant players on a full court; EfficientDet-Lite2 boxes find them.
+// The game filters people at score 0.4; balls may score lower.
+export function createPersonDetector(){
+  return createObjectDetector("https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite",
+    { scoreThreshold:0.25, categoryAllowlist:["person","sports ball"], maxResults:12 });
+}
+// A ball model trained on our own footage (analysis/ball/). models/models.json
+// names it ({"ball": "ball.tflite"}); null there = not shipped yet.
+export async function createBallDetector(){
+  let file = null;
+  try{ file = (await (await fetch("models/models.json", { cache:"no-cache" })).json()).ball; }catch(e){ return null; }
+  return file ? createObjectDetector(`models/${file}`, { scoreThreshold:0.3, maxResults:3 }) : null;
 }
 // pick the target pose: a locked target is re-acquired by nearest foot, else the largest (closest) person
 function pickTarget(ps){
@@ -477,7 +494,7 @@ function onStageTap(e){
   if(!players.length) return;                 // otherwise: pick nearest player as the coached target
   let best = -1, bd = Infinity;
   players.forEach((p,i)=>{ const cx=(p.minX+p.maxX)/2, cy=(p.minY+p.maxY)/2; const d=Math.hypot(cx-nx, cy-ny); if(d<bd){ bd=d; best=i; } });
-  if(best >= 0 && bd < 0.3){ targetLast = players[best].foot; skillState = {}; toast(`Targeting ${athleteName || ("player "+(best+1))}`); }
+  if(best >= 0 && bd < 0.3){ targetLast = players[best].foot; skillState = {}; smoother.reset(); toast(`Targeting ${athleteName || ("player "+(best+1))}`); }
 }
 function loop(){
   if(!running) return;
@@ -488,6 +505,7 @@ function loop(){
     const W = els.coachCanvas.width, Ht = els.coachCanvas.height;
     ctx.clearRect(0,0,W,Ht);
     if(res.landmarks && res.landmarks.length){
+      res.landmarks.forEach(lm => { lm.aspect = W / Ht; });     // form.js geometry needs the frame aspect
       players = res.landmarks.map(lm => {
         const xs=lm.map(p=>p.x), ys=lm.map(p=>p.y);
         const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
@@ -508,7 +526,7 @@ function loop(){
       draw.drawConnectors(tp.lm, PoseLandmarker.POSE_CONNECTIONS, {color:"rgba(255,92,0,.9)", lineWidth:3});
       draw.drawLandmarks(tp.lm, {color:"#f5f5f0", lineWidth:1, radius:4});
       if(players.length > 1 && athleteName){ ctx.fillStyle="#ff5c00"; ctx.fillRect(tp.minX*W, tp.minY*Ht-20, athleteName.length*8+12, 20); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="left"; ctx.fillText(athleteName, tp.minX*W+6, tp.minY*Ht-6); }
-      processPose(tp.lm);
+      processPose(smoother.push(tp.lm));
       // calibration corner markers
       calibPts.forEach((p,i)=>{ ctx.fillStyle="#ff5c00"; ctx.beginPath(); ctx.arc(p.x*W,p.y*Ht,7,0,7); ctx.fill(); ctx.fillStyle="#0c0d11"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText(i+1, p.x*W, p.y*Ht+4); });
       // record the target's court path once the court is calibrated
@@ -519,6 +537,7 @@ function loop(){
   rafId = requestAnimationFrame(loop);
 }
 let currentLm = {};
+const smoother = createSmoother(5);   // 5-frame median of the coached athlete's pose
 function processPose(lm){
   currentLm = lm;
   const ex = EXERCISES[current];
@@ -557,8 +576,12 @@ function processSkill(lm, ex){
     reps++; els.repCount.textContent = reps;
     if(verdict.good) goodAttempts++;
     onAttempt(verdict.good);
-    setCue(verdict.good ? "good" : "warn", `${exLabel()} ${reps}: ${verdict.msg}`);
-    logAttempt({ exercise:current, label:exLabel(), kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:snap(m) });
+    // compare the key frame with the model rep: match % and the biggest fix
+    const { ref } = getReference(current);
+    const cmp = ref && compareToReference(verdict.lm || lm, ref);
+    const fix = cmp && cmp.fixes[0] ? ` Fix: ${cmp.fixes[0].text}` : "";
+    setCue(verdict.good ? "good" : "warn", `${exLabel()} ${reps}: ${verdict.msg}${cmp ? ` Form match ${cmp.score}%.${fix}` : ""}`);
+    logAttempt({ exercise:current, label:exLabel(), kind:"skill", reps, good:verdict.good, msg:verdict.msg, metrics:{ ...snap(m), match: cmp ? cmp.score : null } });
     if(navigator.vibrate) navigator.vibrate(verdict.good ? 30 : [15,40,15]);
   } else if(reps === 0){
     const allMet = results.every(Boolean);

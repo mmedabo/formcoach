@@ -59,3 +59,58 @@ const fps = 30;
   assert.equal(tr.players.length, 4);
 }
 console.log("track.js: all tests passed");
+
+// ---- Ball tracker ----
+import { createBallTracker } from "../js/game/track.js";
+{
+  const H = 720, fps = 30, g = 2000;                                  // px/s² "gravity" in image space
+  const run = (bt, from, to, path, extra = () => []) => {
+    const touches = [];
+    for(let f = Math.round(from * fps); f < Math.round(to * fps); f++){
+      const t = f / fps, p = path(t);
+      const r = bt.update(p ? [{ ...p, score:0.8 }, ...extra(t)] : extra(t), t);
+      if(r.touch) touches.push(+r.touch.t.toFixed(2));
+    }
+    return touches;
+  };
+  // 1. a free arc (up, over the top, down): no touch
+  {
+    const bt = createBallTracker({ scale:H });
+    const arc = t => ({ x:200 + 300 * t, y:600 - 900 * t + 0.5 * g * t * t });
+    assert.deepEqual(run(bt, 0, 0.9, arc), [], "gravity arc is not a touch");
+  }
+  // 2. falling, then hit back up at t = 1.0: one touch near 1.0
+  {
+    const bt = createBallTracker({ scale:H });
+    const path = t => t < 1 ? { x:400, y:100 + 500 * t } : { x:400 + 200 * (t - 1), y:600 - 700 * (t - 1) };
+    const touches = run(bt, 0, 1.6, path);
+    assert.equal(touches.length, 1); assert.ok(Math.abs(touches[0] - 1) < 0.1, `touch at ${touches[0]}`);
+    assert.equal(bt.state.touches, 1);
+  }
+  // 3. a spike: slow drift, then 4× faster straight down → touch; a far-away false detection is ignored
+  {
+    const bt = createBallTracker({ scale:H });
+    // a still decoy with a higher score is dropped after 0.5 s; the spike comes at 1.0 s
+    const path = t => t < 1 ? { x:300 + 150 * t, y:200 + 100 * t } : { x:450 + 100 * (t - 1), y:300 + 1500 * (t - 1) };
+    const decoy = t => [{ x:50, y:50, score:0.95 }];                 // e.g. a white hat in the corner
+    const touches = run(bt, 0, 1.3, path, decoy);
+    assert.equal(touches.length, 1);
+    assert.ok(bt.state.trail.every(p => p.x > 100), "decoy never joined the track");
+  }
+  // 4. rallies: a 2 s rally, a 2 s gap (ends it), a 0.5 s blip (too short to count)
+  {
+    const bt = createBallTracker({ scale:H });
+    const arc = t => ({ x:300, y:300 + 50 * Math.sin(t * 3) });
+    run(bt, 0, 2, arc); run(bt, 2, 4, () => null); run(bt, 4, 4.5, arc); run(bt, 4.5, 6.5, () => null);
+    assert.equal(bt.state.rallies, 1); assert.equal(bt.state.active, false);
+  }
+}
+console.log("ball tracker: all tests passed");
+// 5. a still false detection (a hat) never shows as a rally, even for a moment
+{
+  const bt = createBallTracker({ scale:720 });
+  let shown = 0;
+  for(let f = 0; f < 90; f++){ bt.update([{ x:50, y:50, score:0.9 }], f / 30); if(bt.state.active || bt.state.rallies) shown++; }
+  assert.equal(shown, 0);
+}
+console.log("ball tracker: still-object check passed");

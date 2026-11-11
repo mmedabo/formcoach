@@ -1,7 +1,8 @@
 // ============================================================================
 //  Game tracking — pure logic for the live game overlay (no DOM, Node-testable).
 //  Court homography from 4 tapped corners, a 4-player tracker on the court
-//  plane, and per-player movement stats (distance + stamina).
+//  plane, per-player movement stats (distance + stamina), and a ball tracker
+//  (rallies + touches).
 // ============================================================================
 
 export const COURT_W = 16, COURT_H = 8;          // beach court, metres
@@ -61,7 +62,7 @@ export function createTracker(){
   let players = [];
 
   function newPlayer(pos, t){
-    return { slot:players.length, pos, seen:t, anchor:pos, anchorT:t, dist:0, stamina:100, visible:true };
+    return { slot:players.length, pos, seen:t, anchor:pos, anchorT:t, dist:0, stamina:100, touches:0, visible:true };
   }
   function move(p, f, t){
     const dt = t - p.seen;
@@ -84,7 +85,7 @@ export function createTracker(){
   return {
     get players(){ return players; },
     reset(){ players = []; },
-    resetStats(){ players.forEach(p => { p.dist = 0; p.stamina = 100; }); },
+    resetStats(){ players.forEach(p => { p.dist = 0; p.stamina = 100; p.touches = 0; }); },
     update(feet, t){
       players.forEach(p => { p.visible = false; });
       const pairs = [];
@@ -110,5 +111,78 @@ export function createTracker(){
       }
       return players;
     }
+  };
+}
+
+// ---- Ball tracker ------------------------------------------------------------
+// update(dets, t): dets = [{ x, y, score }] ball centres in pixels, t = seconds.
+// It follows one ball, ends a rally after RALLY_GAP_S without the ball (the rule
+// in analysis/segment_rallies.py), and marks a touch where the path changes in a
+// way gravity cannot cause: falling → rising, a sideways reversal, or a sudden
+// speed-up (a spike). A slow arc over the top is NOT a touch. A detection that
+// stays still (a white hat, a ball resting on the sand) is not a ball in play:
+// its spot is ignored for STATIC_IGNORE_S.
+const RALLY_GAP_S = 1.5, MIN_RALLY_S = 1, TOUCH_MIN_GAP_S = 0.3, TRAIL_S = 1;
+const STATIC_S = 0.5, STATIC_IGNORE_S = 5;
+export function createBallTracker({ scale = 720 } = {}){        // scale = frame height in px
+  const vmin = 0.15 * scale;                                    // px/s below which motion is noise
+  let pts = [], lastSeen = -Infinity, rallyStart = null, rallies = 0, touches = 0, lastTouchT = -Infinity;
+  let ignored = [];                                             // [{ x, y, until }] still objects
+
+  function endRally(){
+    if(rallyStart != null && lastSeen - rallyStart >= MIN_RALLY_S) rallies++;
+    rallyStart = null; touches = 0; pts = [];
+  }
+  function pick(dets, t){
+    ignored = ignored.filter(s => s.until > t);
+    dets = dets.filter(d => !ignored.some(s => Math.hypot(d.x - s.x, d.y - s.y) < 0.04 * scale));
+    if(!dets.length) return null;
+    const last = pts[pts.length - 1];
+    if(!last || t - lastSeen > 0.5) return dets.reduce((a, b) => b.score > a.score ? b : a);
+    const prev = pts[pts.length - 2], dt = t - last.t;
+    const px = prev ? last.x + (last.x - prev.x) / Math.max(last.t - prev.t, 1e-3) * dt : last.x;
+    const py = prev ? last.y + (last.y - prev.y) / Math.max(last.t - prev.t, 1e-3) * dt : last.y;
+    const gate = 0.25 * scale + 1.5 * scale * dt;               // grows while the ball is unseen
+    let best = null, bd = gate;
+    for(const d of dets){ const e = Math.hypot(d.x - px, d.y - py); if(e < bd){ bd = e; best = d; } }
+    return best;
+  }
+  function touchAt(){
+    if(pts.length < 5) return null;
+    const [a, , m, , b] = pts.slice(-5);
+    const v1 = { x:(m.x - a.x) / (m.t - a.t || 1e-3), y:(m.y - a.y) / (m.t - a.t || 1e-3) };
+    const v2 = { x:(b.x - m.x) / (b.t - m.t || 1e-3), y:(b.y - m.y) / (b.t - m.t || 1e-3) };
+    const s1 = Math.hypot(v1.x, v1.y), s2 = Math.hypot(v2.x, v2.y);
+    const fallToRise = v1.y > vmin && v2.y < -vmin;             // image y grows downward
+    const sideFlip = v1.x * v2.x < 0 && Math.abs(v1.x) > vmin && Math.abs(v2.x) > vmin;
+    const speedUp = s2 > 2 * s1 && s2 > 3 * vmin;
+    return (fallToRise || sideFlip || speedUp) && m.t - lastTouchT > TOUCH_MIN_GAP_S ? m : null;
+  }
+
+  return {
+    reset(){ pts = []; lastSeen = -Infinity; rallyStart = null; rallies = 0; touches = 0; lastTouchT = -Infinity; },
+    update(dets, t){
+      if(pts.length && t - lastSeen > RALLY_GAP_S) endRally();
+      const b = pick(dets, t);
+      let touch = null;
+      if(b){
+        if(rallyStart == null) rallyStart = t;
+        pts.push({ x:b.x, y:b.y, t }); lastSeen = t;
+        while(pts.length > 2 && t - pts[0].t > TRAIL_S) pts.shift();
+        const old = pts.filter(p => t - p.t >= STATIC_S);
+        if(old.length && pts.every(p => Math.hypot(p.x - b.x, p.y - b.y) < 0.03 * scale)){
+          ignored.push({ x:b.x, y:b.y, until:t + STATIC_IGNORE_S });   // still for 0.5 s: not in play
+          pts = []; rallyStart = null; touches = 0;
+          return { ball:null, touch:null };
+        }
+        touch = touchAt();
+        if(touch){ touches++; lastTouchT = touch.t; }
+      }
+      return { ball: b ? { x:b.x, y:b.y } : null, touch };
+    },
+    get state(){
+      // a rally counts once it has lasted MIN_RALLY_S, so a still false detection never shows as one
+      return { rallies, active: rallyStart != null && lastSeen - rallyStart >= MIN_RALLY_S, touches, trail: pts };
+    },
   };
 }

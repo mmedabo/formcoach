@@ -67,8 +67,11 @@ function straightenVertex(p, iA, iVert, iC, group){
 }
 
 // Returns a corrected copy of the landmarks for the given fault focus.
+// Rotations run in isotropic units (x scaled by the frame aspect), so a target
+// angle is a true angle on screen; x is scaled back at the end.
 export function computeCorrection(lm, focus, target){
-  const p = clone(lm);
+  const k = lm.aspect || 1;
+  const p = clone(lm); p.forEach(q => { q.x *= k; });
   switch(focus){
     case "kneeDepth":
       setAngle(p, LHIP, LKN, [LANK,29,31], target||100);
@@ -102,6 +105,7 @@ export function computeCorrection(lm, focus, target){
     case "handsLevel": {
       const y=Math.min(p[LWR].y, p[RWR].y); if(p[LWR]) p[LWR].y=y; if(p[RWR]) p[RWR].y=y; break; }
   }
+  p.forEach(q => { q.x /= k; }); p.aspect = lm.aspect;
   return p;
 }
 
