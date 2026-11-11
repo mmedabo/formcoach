@@ -6,7 +6,7 @@
 //  Only the correction OUTPUT is restyled; input/page chrome keep the app look.
 // ============================================================================
 
-import { EXERCISES, takeRecordedClip } from "../coach/coach.js";
+import { EXERCISES, takeRecordedClip, saveReference } from "../coach/coach.js";
 import { analyzeVideoFile } from "../coach/analyze.js";
 import { getDemoProvider, describeFocus, drawPose, FOCUS } from "../coach/demo.js";
 
@@ -96,7 +96,28 @@ export function cineOutput(r){
         r.verdicts.map(v => `<span class="rd ${v.good ? "g" : "w"}" title="Rep ${v.rep}: ${v.msg.replace(/"/g,"&quot;")}">${v.rep}</span>`).join("")}</div></div>`
     : "";
   const topFix = r.corrections.length ? r.corrections[0].msg
+    : r.fixes && r.fixes.length ? r.fixes[0].msg
     : r.reps ? "Keep it up — repeat and bank the reps." : (r.hint || "Frame your whole body and try again.");
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+  // form match vs the model rep, with the corrective actions that came up most
+  const matchCard = r.match ? `<div class="cine-card match">
+      <h4>Form match <span class="micro">vs ${r.match.custom ? "your model rep" : "coaching model"}</span></h4>
+      <div class="match-row"><b class="match-num">${r.match.score}%</b>
+        <div class="rep-dots">${r.verdicts.filter(v => v.match != null).map(v =>
+          `<span class="rd ${v.match >= 70 ? "g" : "w"}" title="Rep ${v.rep}: ${v.match}%">${v.match}</span>`).join("")}</div></div>
+      <h4 class="sub">Corrective actions</h4>
+      <ul>${r.fixes.length ? r.fixes.slice(0, 3).map(f => `<li><span class="c-n">${f.count}×</span>${esc(f.msg)}</li>`).join("")
+        : `<li class="none">Every rep is within tolerance of the model.</li>`}</ul>
+      <div class="match-actions">
+        ${r.bestFeatures ? `<button type="button" class="coach-btn small" id="setModel">Use best rep as my model</button>` : ""}
+        ${r.match.custom ? `<button type="button" class="coach-btn small" id="resetModel">Reset to coaching model</button>` : ""}
+      </div></div>` : "";
+  // spike: take-off → peak → contact → landing, from the whole clip
+  const jumpCard = r.jumps && r.jumps.length ? `<div class="cine-card jumps"><h4>Spike timeline</h4><ul>${
+      r.jumps.map((j, i) => `<li><b>Jump ${i + 1}</b> · ${j.airTime.toFixed(2)} s in the air · ≈ ${j.heightCm} cm jump ·
+        contact ${j.contactVsApexMs >= 0 ? "+" : ""}${j.contactVsApexMs} ms vs peak
+        <span class="jt ${j.timing}">${esc(j.cue)}</span></li>`).join("")}</ul>
+      <p class="micro">Jump height is estimated from air time (h = g·T²/8). Timing resolution is about 70 ms.</p></div>` : "";
   const coverageWarn = r.reps === 0 && r.poseCoverage < 0.4
     ? `<p class="cine-warn">Heads up: your body was only in frame ${Math.round(r.poseCoverage*100)}% of the clip. Stand back so you're fully visible.</p>`
     : "";
@@ -116,6 +137,8 @@ export function cineOutput(r){
       </div>
     </div>
     ${coverageWarn}
+    ${matchCard}
+    ${jumpCard}
     <div class="cine-grid">
       <div class="cine-card muscles">
         <h4>Muscles worked</h4>
@@ -140,7 +163,9 @@ export function playerHTML(r){
         <div class="cp-pane"><div class="cp-tag">Your form</div>
           <div class="cp-video"><video id="playClip" playsinline muted loop></video><canvas id="clipCanvas"></canvas></div></div>
         <div class="cp-pane"><div class="cp-tag good">Verdict</div>
-          <div class="cp-video demo clean"><div class="cp-clean">✓<span>Clean form — no corrections needed. Your reps match the model.</span></div></div></div>
+          <div class="cp-video demo clean">${r.reps
+            ? `<div class="cp-clean">✓<span>Clean form — no corrections needed. Your reps match the model.</span></div>`
+            : `<div class="cp-clean none">—<span>No reps detected, so there is nothing to compare yet.</span></div>`}</div></div>
       </div>
     </div>`;
   }
@@ -345,6 +370,14 @@ export function renderResults(app, ctx){
       els.empty.innerHTML = `<b>Clip analysed ✓</b>Your correction report is on the right. Add another clip anytime.`;
       els.out.innerHTML = playerHTML(r) + cineOutput(r);
       playerCleanup = wirePlayer(els.out, r, objUrl);
+      const setModel = els.out.querySelector("#setModel"), resetModel = els.out.querySelector("#resetModel");
+      if(setModel) setModel.addEventListener("click", () => {
+        setState(saveReference(r.exerciseId, r.bestFeatures) ? "Model saved — the next clip is compared with it" : "Couldn't save the model");
+        setModel.disabled = true;
+      });
+      if(resetModel) resetModel.addEventListener("click", () => {
+        saveReference(r.exerciseId, null); setState("Back to the coaching model"); resetModel.disabled = true;
+      });
       setState(r.reps ? `${r.good}/${r.reps} clean` : "No reps detected");
     }catch(err){
       console.error(err);

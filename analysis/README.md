@@ -77,3 +77,5 @@ python bv_tracker_v1.py clip.mp4 --model path/to/ball_weights.pt
 - `bv_live.py` — live overlay: player rings, name tags, court map.
 - `segment_rallies.py` — splits the ball-point stream into rallies by gap size.
 - `extract_frames.py` — samples frames for building a ball-detection dataset.
+- `ball/` — the ball model pipeline for the web app: DART auto-labels →
+  MediaPipe Model Maker → `models/ball.tflite`. See `ball/README.md`.

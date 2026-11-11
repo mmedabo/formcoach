@@ -4,17 +4,20 @@
 //  user taps the 4 court corners once; each player's feet (bottom of the box)
 //  are then mapped onto the court to draw rings, name tags, a court map,
 //  distance and stamina. People off the court (referee, spectators) are skipped.
+//  The ball is tracked too (rallies, touches, who touched it): from our own
+//  trained model when models/models.json names one (analysis/ball/), else
+//  from the detector's generic COCO "sports ball" class.
 //  mountGame(container) builds the UI; unmountGame() stops the camera.
 // ============================================================================
 
-import { createPersonDetector } from "../coach/coach.js";
+import { createPersonDetector, createBallDetector } from "../coach/coach.js";
 import { PALETTE as COLORS } from "../court/mapping.js";
-import { homography, project, createTracker, onCourt, COURT_W, COURT_H, COURT_CORNERS } from "./track.js";
+import { homography, project, createTracker, createBallTracker, onCourt, COURT_W, COURT_H, COURT_CORNERS } from "./track.js";
 
 const CORNER_NAMES = ["near-left", "near-right", "far-right", "far-left"];
 const RING_M = 0.6;                 // ring radius on the sand, metres
 
-let detector = null, stream = null, clipUrl = null, rafId = null, running = false;
+let detector = null, ballDetector, ball = createBallTracker(), flashes = [], stream = null, clipUrl = null, rafId = null, running = false;
 let H = null, Hinv = null, taps = null, names = [], lastPanel = 0;
 const tracker = createTracker();
 const els = {};
@@ -31,6 +34,7 @@ async function startSource(file){
     els.startCam.disabled = true;
     badge("Loading model…", false); setCue("info", "Loading the player detection model…");
     if(!detector) detector = await createPersonDetector();
+    if(ballDetector === undefined) ballDetector = await createBallDetector();   // null = not shipped
     const v = els.gameVideo;
     if(file){
       clipUrl = URL.createObjectURL(file);
@@ -47,6 +51,7 @@ async function startSource(file){
     els.gameEmpty.style.display = "none";
     [els.stopCam, els.calibrate, els.resetStats].forEach(b => b.disabled = false);
     running = true; H = Hinv = null; tracker.reset();
+    ball = createBallTracker({ scale:v.videoHeight }); flashes = [];
     badge("Live", true);
     startCalibration();
     loop();
@@ -88,7 +93,7 @@ function onTap(e){
   const h = homography(taps, COURT_CORNERS);
   if(!h){ taps = []; setCue("warn", "Those 4 points do not form a court. Tap again, starting near-left."); return; }
   H = h; Hinv = homography(COURT_CORNERS, taps); taps = null;
-  tracker.reset();
+  tracker.reset(); ball.reset();
   if(clipUrl) els.gameVideo.play();
   setCue("good", "Court set. Tracking players. Tap Calibrate court again if the camera moves.");
 }
@@ -102,16 +107,22 @@ function loop(){
     const s = c.width / (c.clientWidth || c.width);   // sizes below are in on-screen CSS px
     if(taps) drawTaps(ctx, s);
     else if(H){
-      const t = performance.now() / 1000;
-      const res = detector.detectForVideo(v, performance.now());
-      const people = res.detections.map(d => person(d.boundingBox)).filter(p => onCourt(p.court));
+      const now = performance.now(), t = now / 1000;
+      const res = detector.detectForVideo(v, now);
+      const cat = d => d.categories[0];
+      const people = res.detections.filter(d => cat(d).categoryName === "person" && cat(d).score >= 0.4)
+        .map(d => person(d.boundingBox)).filter(p => onCourt(p.court));
       const players = tracker.update(people.map(p => p.court), t);
+      const ballDets = ballDetector ? ballDetector.detectForVideo(v, now).detections
+        : res.detections.filter(d => cat(d).categoryName === "sports ball");
+      const b = ball.update(ballDets.map(d => { const bb = d.boundingBox;
+        return { x:bb.originX + bb.width / 2, y:bb.originY + bb.height / 2, score:cat(d).score }; }), t);
+      const seen = players.filter(p => p.visible).map(p => ({ p, det:nearest(people, p.pos) })).filter(x => x.det);
+      if(b.touch){ creditTouch(seen, b.touch); flashes.push({ ...b.touch, until:t + 0.6 }); }
       drawCourt(ctx, s);
       for(const p of players.filter(p => p.visible)) drawRing(ctx, p, s);
-      for(const p of players.filter(p => p.visible)){
-        const det = nearest(people, p.pos);
-        if(det) drawTag(ctx, p, det.head, s);
-      }
+      for(const { p, det } of seen) drawTag(ctx, p, det.head, s);
+      drawBall(ctx, b.ball, t, s);
       if(t - lastPanel > 0.25){ lastPanel = t; renderPanel(players); }
     }
   }
@@ -120,7 +131,18 @@ function loop(){
 // Feet = bottom-centre of the box (pixels → court metres); head = top-centre.
 function person(b){
   const x = b.originX + b.width / 2;
-  return { court:project(H, x, b.originY + b.height), head:{ x, y:b.originY } };
+  return { court:project(H, x, b.originY + b.height), head:{ x, y:b.originY }, box:b };
+}
+// A touch goes to the player whose box is closest to the ball (within half a body height).
+function creditTouch(seen, at){
+  let best = null, bd = Infinity;
+  for(const { p, det:{ box:b } } of seen){
+    const dx = Math.max(b.originX - at.x, 0, at.x - (b.originX + b.width));
+    const dy = Math.max(b.originY - at.y, 0, at.y - (b.originY + b.height));
+    const d = Math.hypot(dx, dy);
+    if(d < bd && d < 0.5 * b.height){ bd = d; best = p; }
+  }
+  if(best) best.touches++;
 }
 function nearest(people, pos){
   let best = null, bd = 1.5;
@@ -146,6 +168,29 @@ function drawCourt(ctx, s){                       // faint outline + net line co
   ctx.closePath(); ctx.stroke();
   ctx.setLineDash([8 * s, 8 * s]); ctx.beginPath();
   ctx.moveTo(...project(Hinv, COURT_W / 2, 0)); ctx.lineTo(...project(Hinv, COURT_W / 2, COURT_H)); ctx.stroke();
+  ctx.restore();
+}
+function drawBall(ctx, at, t, s){
+  const { trail } = ball.state;
+  ctx.save(); ctx.lineCap = "round";
+  for(let i = 1; i < trail.length; i++){                     // fading trail, newest brightest
+    ctx.strokeStyle = `rgba(255,255,255,${0.15 + 0.6 * i / trail.length})`; ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.moveTo(trail[i - 1].x, trail[i - 1].y); ctx.lineTo(trail[i].x, trail[i].y); ctx.stroke();
+  }
+  if(at){                                                     // lock-on marker
+    ctx.strokeStyle = "#ff5c00"; ctx.lineWidth = 2.5 * s; ctx.shadowColor = "#ff5c00"; ctx.shadowBlur = 10 * s;
+    ctx.beginPath(); ctx.arc(at.x, at.y, 14 * s, 0, Math.PI * 2); ctx.stroke();
+    for(const [dx, dy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+      ctx.beginPath(); ctx.moveTo(at.x + dx * 18 * s, at.y + dy * 10 * s); ctx.lineTo(at.x + dx * 18 * s, at.y + dy * 18 * s);
+      ctx.lineTo(at.x + dx * 10 * s, at.y + dy * 18 * s); ctx.stroke();
+    }
+  }
+  flashes = flashes.filter(f => f.until > t);
+  for(const f of flashes){                                    // touch burst
+    const k = (f.until - t) / 0.6;
+    ctx.globalAlpha = k; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2 * s;
+    ctx.beginPath(); ctx.arc(f.x, f.y, (30 - 18 * k) * s, 0, Math.PI * 2); ctx.stroke();
+  }
   ctx.restore();
 }
 function ringPath(ctx, [cx, cy], r){
@@ -182,8 +227,12 @@ function renderPanel(players){
     return `<div class="game-player${p.visible ? "" : " lost"}" style="--pc:${col}">
       <div class="gp-top"><b>${escapeHtml(nameOf(p))}</b><span class="micro">Stamina</span><strong>${Math.round(p.stamina)}</strong></div>
       <div class="gp-bar"><i style="width:${p.stamina}%"></i></div>
-      <div class="gp-foot micro"><span>Move</span><span>${p.dist.toFixed(1)} m</span></div></div>`;
+      <div class="gp-foot micro"><span>Move ${p.dist.toFixed(1)} m</span><span>Touches ${p.touches}</span></div></div>`;
   }).join("") : `<div class="empty-state">No players on the court yet.</div>`;
+  const bs = ball.state;
+  const n = bs.rallies + (bs.active ? 1 : 0);
+  els.gameRally.innerHTML = `<b>${n}</b> ${n === 1 ? "rally" : "rallies"} · <b>${bs.touches}</b> ${bs.touches === 1 ? "touch" : "touches"} this rally
+    <span class="micro">Ball: ${ballDetector ? "trained model" : "generic detector"}</span>`;
   drawMap(players);
 }
 const escapeHtml = s => s.replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
@@ -212,7 +261,7 @@ function gameHTML(){
   return `
   <div class="page-hero">
     <div><p class="eyebrow"><span class="dot"></span> Computer vision · Beach game</p><h2>Game Tracker</h2>
-    <p>Point a <b>fixed camera</b> at the court, or load a clip. Tap the 4 court corners once. Every player then gets a ring, a name tag, distance moved and a stamina estimate. All on-device; nothing leaves your browser.</p></div>
+    <p>Point a <b>fixed camera</b> at the court, or load a clip. Tap the 4 court corners once. Every player then gets a ring, a name tag, distance moved and a stamina estimate. The ball is tracked for rallies and touches. All on-device; nothing leaves your browser.</p></div>
     <span class="route-chip">Live game overlay</span>
   </div>
   <div class="game-layout">
@@ -238,6 +287,7 @@ function gameHTML(){
     <div class="panel">
       <p class="micro">Court map</p>
       <canvas class="game-map" id="gameMap"></canvas>
+      <div class="game-rally" id="gameRally"></div>
       <div class="game-players" id="gamePlayers"><div class="empty-state">No players on the court yet.</div></div>
       <p class="coach-note">Stamina starts at 100. It drops with distance and sprint speed, and recovers slowly while a player stands. It is an estimate from movement only, not a medical measure.</p>
     </div>
@@ -246,12 +296,12 @@ function gameHTML(){
 export function mountGame(container){
   container.innerHTML = gameHTML();
   container.classList.add("page");
-  ["gameStage","gameVideo","gameCanvas","gameBadge","gameBadgeText","gameEmpty","gameCue","startCam","gameFile","calibrate","resetStats","stopCam","gameNames","gameMap","gamePlayers"].forEach(id => els[id] = ID(id));
+  ["gameStage","gameVideo","gameCanvas","gameBadge","gameBadgeText","gameEmpty","gameCue","startCam","gameFile","calibrate","resetStats","stopCam","gameNames","gameMap","gameRally","gamePlayers"].forEach(id => els[id] = ID(id));
   running = false; H = Hinv = null; taps = null; names = []; tracker.reset();
   els.startCam.addEventListener("click", () => startSource(null));
   els.gameFile.addEventListener("change", () => { const f = els.gameFile.files[0]; els.gameFile.value = ""; if(f) startSource(f); });
   els.calibrate.addEventListener("click", startCalibration);
-  els.resetStats.addEventListener("click", () => { tracker.resetStats(); renderPanel(tracker.players); });
+  els.resetStats.addEventListener("click", () => { tracker.resetStats(); ball.reset(); renderPanel(tracker.players); });
   els.stopCam.addEventListener("click", stopSource);
   els.gameCanvas.addEventListener("click", onTap);
   els.gameNames.addEventListener("input", () => { names = els.gameNames.value.split(",").map(n => n.trim()); renderPanel(tracker.players); });

@@ -2,12 +2,14 @@
 //  Offline analyzer — grades a recorded / uploaded clip with the SAME exercise
 //  criteria the live Form Coach uses (EXERCISES from coach.js), so results stay
 //  consistent. It seek-samples the video through the pose landmarker (faster and
-//  more deterministic than real-time playback) and replays the live rep / skill
-//  state machine over the sampled frames.
+//  more deterministic than real-time playback), repairs left/right label flips
+//  over the whole clip, smooths it (form.js), and replays the live rep / skill
+//  state machine. Each rep is also scored against the model rep (form match).
 //    analyzeVideoFile(file, exerciseId, onProgress) -> summary object
 // ============================================================================
 
-import { EXERCISES, metrics, createLandmarker } from "./coach.js";
+import { EXERCISES, metrics, createLandmarker, getReference } from "./coach.js";
+import { createSmoother, fixSideFlips, compareToReference, featuresOf, spikeTimeline } from "./form.js";
 
 const SAMPLE_FPS = 15;              // frames we grade per second of video
 const seekTo = (v, t) => new Promise(res => {
@@ -42,7 +44,7 @@ function gradeSkillFrame(ex, lm, S, t){
   const m = metrics(lm);
   ex.criteria.forEach((c, i) => { if(c.test(m, S)) S.critPass[i]++; });
   const v = ex.detect(m, S);               // detect() mutates S, same as live skillState
-  return v ? { good:v.good, msg:v.msg, type:v.good?"good":"warn", focus:v.focus||null, target:v.target??null, lm, t } : null;
+  return v ? { good:v.good, msg:v.msg, type:v.good?"good":"warn", focus:v.focus||null, target:v.target??null, lm:v.lm||lm, t } : null;
 }
 
 function tally(list){
@@ -74,33 +76,54 @@ export async function analyzeVideoFile(file, exerciseId, onProgress){
 
     const verdicts = [], track = [], faults = [];
     let framesWithPose = 0, framesTotal = 0, ts = 0;
-    const step = 1 / SAMPLE_FPS;
+    const step = 1 / SAMPLE_FPS, aspect = (video.videoWidth / video.videoHeight) || 1;
 
+    // Pass 1: pose for every sampled frame.
+    const raw = [];
     for(let t = 0; t < duration; t += step){
       await seekTo(video, t);
       framesTotal++;
       const res = landmarker.detectForVideo(video, (ts += 1000 / SAMPLE_FPS));
       if(res.landmarks && res.landmarks.length){
-        framesWithPose++;
         const lm = res.landmarks[0];
-        track.push({ t, lm });                 // for the synced skeleton overlay on the clip
-        const v = isSkill ? gradeSkillFrame(ex, lm, S, t) : gradeRepFrame(ex, lm, S, t);
-        if(v){
-          const rep = verdicts.length + 1;
-          verdicts.push({ rep, good: v.type === "good", msg: v.msg, type: v.type });
-          if(!v.good && v.focus && v.lm)       // a fixable fault with a key frame to show
-            faults.push({ rep, t:v.t, focus:v.focus, target:v.target, msg:v.msg, lm:v.lm, exerciseId });
-        }
+        lm.aspect = aspect;                  // form.js geometry needs the frame aspect
+        raw.push({ t, lm });
       }
-      if(onProgress) onProgress(Math.min(1, t / duration));
+      if(onProgress) onProgress(Math.min(0.95, t / duration));
+    }
+    landmarker.close && landmarker.close();
+
+    // Pass 2: repair left/right label flips over the whole clip, smooth, grade.
+    const flipsFixed = fixSideFlips(raw.map(f => f.lm));
+    const smoother = createSmoother(5), { ref, custom } = getReference(exerciseId);
+    for(const { t, lm: rawLm } of raw){
+      framesWithPose++;
+      const lm = smoother.push(rawLm);
+      track.push({ t, lm });                 // for the synced skeleton overlay on the clip
+      const v = isSkill ? gradeSkillFrame(ex, lm, S, t) : gradeRepFrame(ex, lm, S, t);
+      if(v){
+        const rep = verdicts.length + 1;
+        const cmp = ref && v.lm ? compareToReference(v.lm, ref) : null;
+        verdicts.push({ rep, good: v.type === "good", msg: v.msg, type: v.type, t: v.t,
+          match: cmp ? cmp.score : null, fixes: cmp ? cmp.fixes.map(f => f.text) : [],
+          features: ref && v.lm ? featuresOf(v.lm, ref) : null });
+        if(!v.good && v.focus && v.lm)       // a fixable fault with a key frame to show
+          faults.push({ rep, t:v.t, focus:v.focus, target:v.target, msg:v.msg, lm:v.lm, exerciseId });
+      }
     }
     if(onProgress) onProgress(1);
-    landmarker.close && landmarker.close();
 
     const reps = verdicts.length;
     const good = verdicts.filter(v => v.good).length;
     const corrections = tally(verdicts.filter(v => !v.good).map(v => v.msg));
     const strengths   = tally(verdicts.filter(v =>  v.good).map(v => v.msg));
+
+    // form match vs the model rep, and the fixes that came up most often
+    const matched = verdicts.filter(v => v.match != null);
+    const match = matched.length ? { score: Math.round(matched.reduce((s, v) => s + v.match, 0) / matched.length), custom } : null;
+    const fixes = tally(verdicts.flatMap(v => v.fixes));
+    const best = matched.length ? matched.reduce((a, b) => b.match > a.match ? b : a) : null;
+    const jumps = exerciseId === "spike" ? spikeTimeline(track).map(({ contactLm, ...j }) => j) : [];
 
     const checkpoints = isSkill
       ? ex.criteria.map((c, i) => ({ name: c.name, met: framesWithPose > 0 && S.critPass[i] / framesWithPose > 0.25 }))
@@ -110,6 +133,7 @@ export async function analyzeVideoFile(file, exerciseId, onProgress){
       exerciseId, label: ex.label, kind: ex.type, reps, good,
       score: reps ? Math.round((good / reps) * 100) : null,
       verdicts, corrections, strengths, checkpoints, faults, track,
+      match, fixes, jumps, flipsFixed, bestFeatures: best ? best.features : null,
       poseCoverage: framesTotal ? framesWithPose / framesTotal : 0,
       videoUrl: url,              // caller owns this; revoke when the screen tears down
       durationSec: Math.round(duration),
